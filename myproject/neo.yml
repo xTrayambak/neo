@@ -1,0 +1,13 @@
+name: myproject
+backend: C
+license: GPL3
+kind: Binary
+binaries: [myproject]
+toolchain:
+  version:
+    major: 2
+    minor: 2
+    patch: 0
+    build: ""
+    metadata: ""
+  cachedNimPath: !!null ~
