@@ -2,12 +2,3 @@
 !*.*
 !*/
 !LICENSE
-
-success.txt
-failed.txt
-balde
-*.out
-*.log
-
-outcomes/
-test262/

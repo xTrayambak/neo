@@ -1,0 +1,13 @@
+name: neo
+backend: C
+license: BSD-3-Clause
+kind: Binary
+binaries: [neo]
+toolchain:
+  version:
+    major: 2
+    minor: 2
+    patch: 0
+    build: ""
+    metadata: ""
+  cachedNimPath: !!null ~
