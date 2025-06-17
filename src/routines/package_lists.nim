@@ -1,7 +1,8 @@
-import std/options
+import std/[os, times, options, base64]
 import ../output
-import ../types/package_lists
-import pkg/[curly, jsony]
+import ../types/package_lists,
+       ./[state, neo_directory]
+import pkg/[curly, jsony, shakar]
 
 const
   ## These lists belong to the Nimble packages index.
@@ -28,11 +29,59 @@ proc readPackageList*(response: Response): Option[PackageList] =
   except JsonError as exc:
     error "Could not parse package list: " & exc.msg
 
+proc cachePackageList*(url: string, list: string) =
+  let filename = base64.encode(url, safe = true)
+
+  initNeoDir()
+  let fullPath = getNeoDir() / "indices" / filename & ".json"
+
+  writeFile(fullPath, list)
+
 proc fetchPackageList*(url: string): Option[PackageList] =
-  displayMessage("<blue>fetching<reset>", "Nim package index")
+  displayMessage(
+    "<blue>fetching<reset>",
+    if InternalPackageLists.contains(url):
+      "Nim package index"
+    else:
+      "Package index from <green>" & url & "<reset>"
+  )
   let response = packageListFetchingPool.get(url)
 
-  response.readPackageList()
+  let list = response.readPackageList()
+  if *list:
+    cachePackageList(url, response.body)
+
+  list
+
+proc getCachedPackageList*(url: string): Option[PackageList] =
+  let filename = base64.encode(url, safe = true)
+
+  initNeoDir()
+  let fullPath = getNeoDir() / "indices" / filename & ".json"
+
+  if fileExists(fullPath):
+    try:
+      return some(fromJson(readFile(fullPath), PackageList))
+    except OSError as exc:
+      error "Failed to read cached package index: " & exc.msg
+    except JsonError as exc:
+      error "Failed to parse cached package index: " & exc.msg
+
+proc lazilyFetchPackageList*(url: string): Option[PackageList] =
+  let
+    currTime = epochTime()
+    lastSync = getLastIndexSyncTime()
+  
+  # Our current threshold is 4 hours (14400 seconds)
+  # TODO: Make this threshold customizable.
+  if (currTime - lastSync) < 14400:
+    let cached = getCachedPackageList(url)
+
+    if *cached:
+      return cached
+
+  setLastIndexSyncTime(currTime)
+  fetchPackageList(url)
 
 proc fetchPackageLists*(urls: openArray[string]): seq[Option[PackageList]] =
   ## Fetch package lists from multiple URLs in parallel.

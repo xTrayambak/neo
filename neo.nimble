@@ -18,3 +18,5 @@ requires "semver >= 1.2.3"
 requires "jsony >= 1.1.5"
 requires "shakar >= 0.1.0"
 requires "floof >= 1.0.0"
+
+requires "leveldb >= 0.4.1"

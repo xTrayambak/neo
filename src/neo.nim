@@ -3,7 +3,7 @@ import std/[os, osproc, tables, sequtils, strutils]
 import pkg/[semver, shakar, floof]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
-import ./routines/[initialize, package_lists]
+import ./routines/[initialize, package_lists, state]
 
 const
   NeoVersion* {.strdefine: "NimblePkgVersion".} = "0.1.0"
@@ -140,7 +140,7 @@ proc searchPackageCommand(args: Input) =
     quit(1)
 
   let package = args.arguments[0]
-  let list = fetchPackageList(DefaultPackageList)
+  let list = lazilyFetchPackageList(DefaultPackageList)
   
   if !list:
     # TODO: better errors
@@ -182,6 +182,8 @@ proc searchPackageCommand(args: Input) =
   # displayMessage("<yellow>tip<reset>", "To get more information on a particular package, run `<blue>neo info <package><reset>`")
 
 proc main() {.inline.} =
+  initNeoState()
+
   let args = parseInput()
   case args.command
   of "init":
@@ -194,6 +196,8 @@ proc main() {.inline.} =
     searchPackageCommand(args)
   else:
     error "invalid command <red>`" & args.command & "`<reset>"
+
+  saveNeoState()
 
 when isMainModule:
   main()

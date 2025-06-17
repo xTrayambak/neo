@@ -2,7 +2,6 @@
 ## Everything (and I mean it when I say everything) is compressed here, just to be conservative.
 import std/[os]
 import pkg/[zippy, curly, shakar]
-import ./package_lists
 import ../[argparser]
 
 const
@@ -14,7 +13,7 @@ when defined(linux):
   proc getDataDir(): string =
     getHomeDir() / ".local" / "share"
 
-func getNeoDir*(input: Input): string =
+proc getNeoDir*(input: Input = default(Input)): string =
   if (let flag = input.flag("neo-directory-override"); *flag):
     &flag
   else:
@@ -29,14 +28,10 @@ func getNeoDir*(input: Input): string =
 
 proc populateNeoDir*(directory: string) =
   ## "Populate" the Neo directory with everything needed for
-  ## it to function as intended. Currently, this includes:
-  ## - the official package list
+  ## it to function as intended.
   
-  # Get the official package list
-  let officialPackageList = fetchPackageLists(OfficialPackageLists)
+  discard existsOrCreateDir(directory / "indices")
 
-proc initNeoDir*(input: Input) =
+proc initNeoDir*(input: Input = default(Input)) =
   let directory = getNeoDir(input)
-  
-  if not existsOrCreateDir(directory):
-    populateNeoDir(directory)
+  populateNeoDir(directory)
