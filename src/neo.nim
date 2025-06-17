@@ -23,7 +23,7 @@ proc initializePackageCommand(args: Input) {.noReturn.} =
     kind = askQuestion("Project Type", ["Binary", "Library", "Hybrid"], 0)
     license = askQuestion("License (Optional)")
     toolchainVersion =
-      askVersion("Nim Toolchain Version", default = parseVersion(NimVersion))
+      askQuestion("Nim Toolchain Version", NimVersion)
 
     project = newProject(
       name = name,

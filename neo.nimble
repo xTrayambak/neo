@@ -15,5 +15,4 @@ requires "curly >= 1.1.1"
 requires "noise >= 0.1.10"
 requires "yaml >= 2.1.1"
 requires "semver >= 1.2.3"
-
 requires "jsony >= 1.1.5"

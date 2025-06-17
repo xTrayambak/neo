@@ -7,8 +7,10 @@ type
   NimInvokation* = object
 
   Toolchain* {.ignore: ["cachedNimPath"].} = object
-    version*: Version
+    version*: string
     cachedNimPath* {.defaultVal: none(string).} : Option[string]
+
+func getVersion*(toolchain: Toolchain): Version = toolchain.version.parseVersion()
 
 proc findNimExe*(toolchain: var Toolchain) {.sideEffect.} =
   if *toolchain.cachedNimPath:
@@ -31,7 +33,7 @@ proc findNimExe*(toolchain: var Toolchain) {.sideEffect.} =
         output.splitLines()[0].split("Nim Compiler Version ")[1].split(" [Linux: amd64]")[0]
       )
 
-    if version == toolchain.version:
+    if version == toolchain.getVersion():
       # We found a match.
       toolchain.cachedNimPath = some(nim)
       return
@@ -71,5 +73,5 @@ proc compile*(
 
   move(stats)
 
-func newToolchain*(version: Version = parseVersion(NimVersion)): Toolchain =
+func newToolchain*(version: string = NimVersion): Toolchain =
   Toolchain(version: version)

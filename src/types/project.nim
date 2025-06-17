@@ -15,6 +15,7 @@ type
     kind*: ProjectKind
     binaries*: seq[string]
     toolchain*: Toolchain
+    dependencies*: seq[Package]
 
 func newProject*(
     name: string, license: string, kind: ProjectKind, toolchain: Toolchain
