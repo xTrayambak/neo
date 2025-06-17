@@ -1,7 +1,6 @@
 import std/[os, osproc, strutils, options]
 import ./[compilation_options, backend]
-import ../[sugar]
-import pkg/[yaml, semver]
+import pkg/[yaml, semver, shakar]
 
 type
   NimInvokation* = object

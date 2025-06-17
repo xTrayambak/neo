@@ -1,6 +1,6 @@
 ## Argument parser for Neo, based on `std/parseopt`
-import std/[os, parseopt, logging, tables, strutils]
-import ./[sugar]
+import std/[os, parseopt, logging, tables, strutils, options]
+import pkg/[shakar]
 
 type Input* = object
   command*: string
@@ -17,6 +17,17 @@ proc enabled*(input: Input, switchBig, switchSmall: string): bool {.inline.} =
 proc flag*(input: Input, value: string): Option[string] {.inline.} =
   if input.flags.contains(value):
     return some(input.flags[value])
+
+proc flagAsInt*(input: Input, value: string): Option[int] {.inline.} =
+  let flag = input.flag(value)
+
+  if !flag:
+    return none(int)
+
+  try:
+    return some(parseInt(&flag))
+  except ValueError:
+    return none(int)
 
 proc parseInput*(): Input {.inline.} =
   var

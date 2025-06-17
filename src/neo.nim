@@ -1,11 +1,16 @@
 ## Neo - the new package manager for Nim
-import std/[os, osproc, tables]
-import pkg/[semver]
+import std/[os, osproc, tables, sequtils, strutils]
+import pkg/[semver, shakar, floof]
 import ./[argparser, output]
-import ./types/[project, toolchain, backend, compilation_options]
-import ./routines/[initialize]
+import ./types/[project, toolchain, backend, compilation_options, package_lists]
+import ./routines/[initialize, package_lists]
 
-const NeoVersion* {.strdefine: "NimblePkgVersion".} = "0.1.0"
+const
+  NeoVersion* {.strdefine: "NimblePkgVersion".} = "0.1.0"
+
+  # For the sake of brevity, only show the first 15 closest matches
+  # when searching for packages.
+  MaxMatchesDefault* {.intdefine: "NeoSearchMaxMatchesDefault".} = 15
 
 proc initializePackageCommand(args: Input) {.noReturn.} =
   if args.arguments.len < 1:
@@ -129,6 +134,53 @@ proc runPackageCommand(args: Input) =
   else:
     displayMessage("<red>" & binaryName & "<reset>", "has failed to compile. Check the error above for more information.")
 
+proc searchPackageCommand(args: Input) =
+  if args.arguments.len < 1:
+    displayMessage("<red>error<reset>", "This command expects one argument. It was provided none.")
+    quit(1)
+
+  let package = args.arguments[0]
+  let list = fetchPackageList(DefaultPackageList)
+  
+  if !list:
+    # TODO: better errors
+    displayMessage("<red>error<reset>", "Failed to fetch package index!")
+    quit(1)
+  
+  let index = &list
+
+  stdout.write('\n')
+
+  var limit = MaxMatchesDefault
+
+  if args.flagAsInt("limit") ?= customLimit:
+    limit = customLimit
+  
+  let pkgs = block:
+    var res = newSeq[string](index.len)
+    for i, pkg in index:
+      res[i] = pkg.name
+
+    move(res)
+
+  let results = search(package, pkgs)
+
+  for i, pkg in results:
+    # OPTIMIZE: We're currently doing two lookups per match. We should ideally do one.
+    let package = &index.find(pkg.text)
+
+    if i > limit - 1:
+      continue
+
+    displayMessage("<green>" & pkg.text & "<reset>", package.description)
+  
+  if limit < results.len:
+    stdout.write('\n')
+    displayMessage("<blue>...<reset>", "and <green>" & $(results.len - limit) & "<reset> packages more (use --limit:<N> to see more)")
+
+  # stdout.write('\n')
+  # displayMessage("<yellow>tip<reset>", "To get more information on a particular package, run `<blue>neo info <package><reset>`")
+
 proc main() {.inline.} =
   let args = parseInput()
   case args.command
@@ -138,6 +190,8 @@ proc main() {.inline.} =
     buildPackageCommand(args)
   of "run":
     runPackageCommand(args)
+  of "search":
+    searchPackageCommand(args)
   else:
     error "invalid command <red>`" & args.command & "`<reset>"
 
