@@ -19,9 +19,15 @@ proc gitClone*(url: string, dest: string, depth: uint = 1): bool =
   if dirExists(dest):
     removeDir(dest)
 
-  let (output, code) = execCmdEx(
+  let (_, code) = execCmdEx(
     git & " clone " & url & ' ' & dest &
     " --depth=" & $depth
   )
+
+  code == 0
+
+proc gitInit*(dir: string): bool =
+  let git = getGitPath()
+  let (_, code) = execCmdEx(git & " init " & dir)
 
   code == 0

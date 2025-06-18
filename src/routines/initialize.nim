@@ -1,7 +1,8 @@
 import std/[os, streams, strutils]
 import pkg/[yaml]
 import ../types/[project]
-import ../output
+import ../[output],
+       ./git
 
 proc initializeProject*(project: Project) =
   displayMessage("<blue>initializing<reset>", "project " & project.name)
@@ -59,3 +60,6 @@ proc greetInHindi*(name: string) =
   var stream = newFileStream(project.name / "neo.yml", fmWrite)
   Dumper().dump(project, stream)
   stream.close()
+
+  if not gitInit(project.name):
+    displayMessage("<yellow>warning<reset>", "Failed to initialize Git repository for your new project.")
