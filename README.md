@@ -19,6 +19,7 @@ Neo is currently a ~1.1K LoC project, and has the following features ready and w
 - [X] `neo search` command
 - [X] `neo fmt` command
 - [X] Naive dependency solver
+- [X] `neo info` command
 
 The following are pending tasks that will hopefully be completed soon:
 - [ ] Proper dependency solver
@@ -35,6 +36,8 @@ $ neo build
 
 # Dependencies
 - libcURL
+- git
+- POSIX utilities
 
 # Usage
 ## Creating a project

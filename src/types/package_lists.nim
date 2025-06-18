@@ -3,7 +3,7 @@ import std/options
 type
   PackageListItem* = object
     name*, url*, `method`*: string
-    tags: seq[string]
+    tags*: seq[string]
     description*: string
     license*: string
     web*: string

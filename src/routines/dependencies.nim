@@ -71,10 +71,13 @@ proc getDepPaths*(deps: seq[Dependency]): seq[string] =
 
   move(paths)
 
-proc downloadPackage*(entry: PackageListItem, pkg: PackageRef) =
+proc downloadPackage*(entry: PackageListItem, pkg: PackageRef, ignoreCache: bool = false) =
   let
     meth = entry.`method`
     dest = getDirectoryForPackage(pkg.name)
+
+  if dirExists(dest) and not ignoreCache:
+    return
 
   case meth
   of "git":
@@ -142,6 +145,9 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
     dependency.project = project
     return move(dependency)
   elif *nimbleFilePath:
+    # If this package uses Nimble (very likely right now),
+    # we need to parse a minimal subset of its dependencies so that
+    # we can atleast infer all the packages we require.
     # FIXME: This can probably be made a little less miserable.
     var info = extractRequiresInfo(&nimbleFilePath)
     var dependency = Dependency()
