@@ -31,6 +31,7 @@ proc populateNeoDir*(directory: string) =
   
   discard existsOrCreateDir(directory / "indices")
   discard existsOrCreateDir(directory / "packages")
+  discard existsOrCreateDir(directory / "bin")
 
 proc initNeoDir*(input: Input = default(Input)) =
   let directory = getNeoDir(input)

@@ -3,7 +3,7 @@ import std/[os, osproc, tables, sequtils, strutils]
 import pkg/[semver, shakar, floof, pretty]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
-import ./routines/[initialize, package_lists, state, dependencies]
+import ./routines/[initialize, package_lists, state, dependencies, neo_directory]
 
 const
   NeoVersion* {.strdefine: "NimblePkgVersion".} = "0.1.0"
@@ -195,6 +195,67 @@ proc searchPackageCommand(args: Input) =
   # stdout.write('\n')
   # displayMessage("<yellow>tip<reset>", "To get more information on a particular package, run `<blue>neo info <package><reset>`")
 
+proc installPackageCommand(args: Input) =
+  var 
+    directory = "src"
+    firstArgumentUsed = false
+
+  let sourceFile =
+    if args.arguments.len > 0:
+      directory = args.arguments[0] / "src"
+      firstArgumentUsed = true
+      args.arguments[0] / "neo.yml"
+    else:
+      getCurrentDir() / "neo.yml"
+
+  if not fileExists(sourceFile):
+    error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
+    quit(QuitFailure)
+
+  var project = loadProject(sourceFile)
+  if project.binaries.len < 1:
+    error "This project exposes no binary outputs!"
+    quit(QuitFailure)
+
+  var toolchain = newToolchain(project.toolchain.version)
+
+  var deps: seq[Dependency]
+  try:
+    deps = project.solveDependencies()
+  except CatchableError as exc:
+    error "Failed to solve dependencies: " & exc.msg
+    quit(1)
+  
+  var fail = false
+  for binaryName in project.binaries:
+    displayMessage("<yellow>compiling<reset>", "<green>" & binaryName & "<reset> using the <blue>" & project.backend.toHumanString() & "<reset> backend")
+    
+    let stats = toolchain.compile(project.backend, directory / binaryName & ".nim", CompilationOptions(
+      outputFile: getNeoDir() / "bin" / binaryName,
+      extraFlags: "--define:release --define:speed",
+      appendPaths: getDepPaths(deps))
+    )
+    if stats.successful:
+      displayMessage("<green>" & binaryName & "<reset>", "was built successfully, with <green>" & $stats.unitsCompiled & "<reset> unit(s) compiled.")
+
+      var extraFlags: string
+      for flag, value in args.flags:
+        extraFlags &= "--" & flag & ':' & value
+
+      for switch in args.switches:
+        extraFlags &= "--" & switch
+    else:
+      displayMessage("<red>" & binaryName & "<reset>", "has failed to compile. Check the error above for more information.")
+      fail = true
+      break
+
+  if fail:
+    error "One or more binaries have failed to compile. Check the error(s) above for more information."
+    quit(QuitFailure)
+
+  displayMessage("<green>Installed<reset>", $project.binaries.len & " binar" & (if project.binaries.len == 1: "y" else: "ies") & " successfully.")
+  displayMessage("<yellow>warning<reset>", "Make sure to add " & (getNeoDir() / "bin") & " to your <blue>PATH<reset> environment variable to run these binaries.")
+
 proc showHelpCommand() {.noReturn, sideEffect.} =
   echo "Neo is a package manager for Nim"
   displayMessage("<green>Usage<reset>", "neo <yellow>[command]<reset> <blue>[args]<reset>")
@@ -207,6 +268,7 @@ build                           Build the project in the current directory, if n
 run                             Build and run the project in the current directory, if no path is specified.
 search [name]                   Search the package index for a particular package.
 help                            Show this message.
+install                         Install binaries from the current project.
   """
 
 proc main() {.inline.} =
@@ -224,11 +286,14 @@ proc main() {.inline.} =
     searchPackageCommand(args)
   of "help":
     showHelpCommand()
+  of "install":
+    installPackageCommand(args)
   else:
     if args.command.len < 1:
       showHelpCommand()
     else:
       error "invalid command <red>`" & args.command & "`<reset>"
+      quit(QuitFailure)
 
   saveNeoState()
 
