@@ -12,3 +12,8 @@ dependencies:
   - "yaml"
   - "semver"
   - "jsony"
+  - "shakar"
+  - "results"
+  - "floof"
+  - "pretty"
+  - "leveldb"

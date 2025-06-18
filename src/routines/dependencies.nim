@@ -2,17 +2,18 @@
 ## Currently, we use a very naive recursion-based solver
 ## but once we introduce version constraints, we'll need a smarter solver,
 ## similar to how Nimble has a SAT solver.
-import std/[os, options]
+import std/[os, options, strutils]
 import pkg/shakar
 import ../types/[
   project, package_lists
 ]
 import ../routines/[
-  package_lists,
-  git,
-  neo_directory
-]
-import ../output
+    package_lists,
+    git,
+    neo_directory
+  ],
+  ../routines/nimble/declarativeparser,
+  ../output
 
 type
   SolverError* = object of CatchableError
@@ -26,6 +27,10 @@ type
 
   SolverCache = object
     lists*: seq[PackageList]
+
+  Dependency* = ref object
+    project*: Project
+    deps*: seq[Dependency]
 
 func packageNotFound*(name: string) {.raises: [PackageNotFound].} =
   var exc = newException(PackageNotFound, "")
@@ -50,10 +55,60 @@ proc getDirectoryForPackage*(name: string): string =
 
   dir
 
-proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef) =
+proc isDepInstalled*(dep: PackageRef): bool =
+  dirExists(getDirectoryForPackage(dep.name))
+
+proc getDepPaths*(deps: seq[Dependency]): seq[string] =
+  var paths: seq[string]
+
+  for dep in deps:
+    if dep == nil:
+      # FIXME: This shouldn't happen. Ever.
+      continue
+
+    let base = getDirectoryForPackage(dep.project.name)
+    paths &= base
+    
+    if dirExists(base / "src"):
+      paths &= base / "src"
+    
+    paths &= getDepPaths(dep.deps)
+
+  move(paths)
+
+proc downloadPackage*(entry: PackageListItem, pkg: PackageRef) =
+  let 
+    meth = entry.`method`
+    dest = getDirectoryForPackage(pkg.name)
+
+  case meth
+  of "git":
+    if not gitClone(entry.url, dest):
+      raise newException(
+        CloneFailed, 
+        "Failed to clone repository for dependency <blue>" &
+        pkg.name & "<reset>!"
+      )
+
+    displayMessage("<green>Downloaded<reset>", pkg.name)
+  else:
+    unhandledDownloadMethod(meth)
+
+proc findNimbleFile*(dir: string): Option[string] =
+  for kind, path in walkDir(dir):
+    if kind != pcFile:
+      continue
+
+    if path.endsWith(".nimble"):
+      return some(path)
+
+proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Dependency =
   # Firstly, try to find the dep in our solver cache.
   # The first list is guaranteed to be the main
   # Nimble package index.
+  if dep.name == "nim":
+    return
+
   let package = cache.find(dep.name)
 
   if !package:
@@ -61,25 +116,48 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef) =
   
   # If the package is found, then we can
   # clone it via Git
-  let
-    pkg = &package
-    meth = pkg.`method`
-    dest = getDirectoryForPackage(dep.name)
+  let pkg = &package
+
+  if not isDepInstalled(dep):
+    downloadPackage(pkg, dep)
   
-  case meth
-  of "git":
-    if not gitClone(pkg.url, dest):
-      raise newException(
-        CloneFailed, 
-        "Failed to clone repository for dependency <blue>" &
-        dep.name & "<reset>!"
-      )
+  # Now, we'll load up a Neo project if it exists for that project.
+  # TODO: Load .nimble files as projects too, atleast for now.
+  let
+    projectDir = getDirectoryForPackage(dep.name)
+    neoFilePath = projectDir / "neo.yml"
+    nimbleFilePath = findNimbleFile(projectDir)
 
-    displayMessage("<green>Downloaded<reset>", dep.name)
-  else:
-    unhandledDownloadMethod(meth)
+    neoFileExists = fileExists(neoFilePath)
+    hasAnyManifest = neoFileExists or *nimbleFilePath
 
-proc solveDependencies*(project: var Project) =
+  if not hasAnyManifest:
+    displayMessage("<yellow>warning<reset>", "<green>" & dep.name & "<reset> does not have a `<blue>neo.yml<reset>` or `<blue>.nimble<reset>` file. Its dependencies will not be resolved.")
+    return
+  
+  if neoFileExists:
+    var project = loadProject(neoFilePath)
+    var dependency = Dependency()
+    for childDep in dependency.project.getDependencies():
+      dependency.deps &=
+        handleDep(cache, project, childDep)
+
+    dependency.project = project
+    return move(dependency)
+  elif *nimbleFilePath:
+    # FIXME: This can probably be made a little less miserable.
+    var info = extractRequiresInfo(&nimbleFilePath)
+    var dependency = Dependency()
+    var project = Project(name: dep.name)
+    for req in info.requires:
+      dependency.deps &=
+        handleDep(cache, project, PackageRef(name: req.split(' ')[0]))
+    
+    dependency.project = project
+    return move(dependency)
+  else: unreachable
+
+proc solveDependencies*(project: var Project): seq[Dependency] =
   # Prime-up the cache.
   # For now, we'll only include
   # the base Nimble package index but
@@ -88,6 +166,13 @@ proc solveDependencies*(project: var Project) =
   var cache: SolverCache
   cache.lists &=
     &lazilyFetchPackageList(DefaultPackageList)
-
+  
+  var dependencyVec: seq[Dependency]
   for dep in project.getDependencies():
-    handleDep(cache, project, dep)
+    let dep = handleDep(cache, project, dep)
+    if dep == nil:
+      continue
+
+    dependencyVec &= dep
+
+  move(dependencyVec)

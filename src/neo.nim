@@ -1,6 +1,6 @@
 ## Neo - the new package manager for Nim
 import std/[os, osproc, tables, sequtils, strutils]
-import pkg/[semver, shakar, floof]
+import pkg/[semver, shakar, floof, pretty]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
 import ./routines/[initialize, package_lists, state, dependencies]
@@ -69,15 +69,16 @@ proc buildPackageCommand(args: Input) {.noReturn.} =
   for switch in args.switches:
     extraFlags &= "--" & switch
   
+  var deps: seq[Dependency]
   try:
-    project.solveDependencies()
+    deps = project.solveDependencies()
   except CatchableError as exc:
     error "Failed to solve dependencies: " & exc.msg
     quit(1)
 
   for binFile in project.binaries:
     displayMessage("<yellow>compiling<reset>", "<green>" & binFile & "<reset> using the <blue>" & project.backend.toHumanString() & "<reset> backend")
-    let stats = toolchain.compile(project.backend, directory / binFile & ".nim", CompilationOptions(outputFile: binFile, extraFlags: extraFlags))
+    let stats = toolchain.compile(project.backend, directory / binFile & ".nim", CompilationOptions(outputFile: binFile, extraFlags: extraFlags, appendPaths: getDepPaths(deps)))
 
     if stats.successful:
       displayMessage("<green>" & binFile & "<reset>", "was built successfully, with <green>" & $stats.unitsCompiled & "<reset> unit(s) compiled.")

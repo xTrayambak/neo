@@ -14,13 +14,14 @@ proc getGitPath*(): string =
 
   path
 
-proc gitClone*(url: string, dest: string): bool =
+proc gitClone*(url: string, dest: string, depth: uint = 1): bool =
   let git = getGitPath()
   if dirExists(dest):
     removeDir(dest)
 
   let (output, code) = execCmdEx(
-    git & " clone " & url & ' ' & dest 
+    git & " clone " & url & ' ' & dest &
+    " --depth=" & $depth
   )
 
   code == 0
