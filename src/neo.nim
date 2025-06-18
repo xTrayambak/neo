@@ -1,5 +1,5 @@
 ## Neo - the new package manager for Nim
-import std/[os, osproc, tables, sequtils, strutils]
+import std/[os, osproc, tables, sequtils, strutils, times]
 import pkg/[semver, shakar, floof, pretty]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
@@ -256,6 +256,10 @@ proc installPackageCommand(args: Input) =
   displayMessage("<green>Installed<reset>", $project.binaries.len & " binar" & (if project.binaries.len == 1: "y" else: "ies") & " successfully.")
   displayMessage("<yellow>warning<reset>", "Make sure to add " & (getNeoDir() / "bin") & " to your <blue>PATH<reset> environment variable to run these binaries.")
 
+proc syncIndicesCommand(args: Input) =
+  discard fetchPackageList(DefaultPackageList)
+  setLastIndexSyncTime(epochTime())
+
 proc showHelpCommand() {.noReturn, sideEffect.} =
   echo "Neo is a package manager for Nim"
   displayMessage("<green>Usage<reset>", "neo <yellow>[command]<reset> <blue>[args]<reset>")
@@ -269,6 +273,7 @@ run                             Build and run the project in the current directo
 search [name]                   Search the package index for a particular package.
 help                            Show this message.
 install                         Install binaries from the current project.
+sync                            Synchronize the package index.
   """
 
 proc main() {.inline.} =
@@ -288,6 +293,8 @@ proc main() {.inline.} =
     showHelpCommand()
   of "install":
     installPackageCommand(args)
+  of "sync":
+    syncIndicesCommand(args)
   else:
     if args.command.len < 1:
       showHelpCommand()
