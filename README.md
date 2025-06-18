@@ -9,6 +9,7 @@ Neo is a new package manager for the [Nim programming language](https://nim-lang
 - Add infrastructure for "custom targets" like WASM
 
 # Roadmap
+Neo is currently a ~1.1K LoC project, and has the following features ready and working:
 - [X] Internal storage area (`~/.local/share/neo`)
 - [X] Package lists/indices (stored at `~/.local/share/neo/indices`)
 - [X] Internal state is stored as a LevelDB database (at `~/.local/share/neo/state`)
@@ -16,7 +17,10 @@ Neo is a new package manager for the [Nim programming language](https://nim-lang
 - [X] `neo search` command
 - [X] `neo init` command
 - [X] `neo search` command
+- [X] `neo fmt` command
 - [X] Naive dependency solver
+
+The following are pending tasks that will hopefully be completed soon:
 - [ ] Proper dependency solver
 - [ ] Tasks
 - [ ] Hooks
