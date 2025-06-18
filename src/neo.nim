@@ -103,7 +103,7 @@ proc runPackageCommand(args: Input) =
     error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
     quit(QuitFailure)
 
-  let project = loadProject(sourceFile)
+  var project = loadProject(sourceFile)
   let
     binaryName = block:
       if project.binaries.len > 1:
@@ -124,9 +124,16 @@ proc runPackageCommand(args: Input) =
 
   var toolchain = newToolchain(project.toolchain.version)
 
+  var deps: seq[Dependency]
+  try:
+    deps = project.solveDependencies()
+  except CatchableError as exc:
+    error "Failed to solve dependencies: " & exc.msg
+    quit(1)
+
   displayMessage("<yellow>compiling<reset>", "<green>" & binaryName & "<reset> using the <blue>" & project.backend.toHumanString() & "<reset> backend")
   
-  let stats = toolchain.compile(project.backend, directory / binaryName & ".nim", CompilationOptions(outputFile: binaryName))
+  let stats = toolchain.compile(project.backend, directory / binaryName & ".nim", CompilationOptions(outputFile: binaryName, appendPaths: getDepPaths(deps)))
   if stats.successful:
     displayMessage("<green>" & binaryName & "<reset>", "was built successfully, with <green>" & $stats.unitsCompiled & "<reset> unit(s) compiled.")
 
@@ -188,6 +195,20 @@ proc searchPackageCommand(args: Input) =
   # stdout.write('\n')
   # displayMessage("<yellow>tip<reset>", "To get more information on a particular package, run `<blue>neo info <package><reset>`")
 
+proc showHelpCommand() {.noReturn, sideEffect.} =
+  echo "Neo is a package manager for Nim"
+  displayMessage("<green>Usage<reset>", "neo <yellow>[command]<reset> <blue>[args]<reset>")
+
+  echo """
+
+Commands:
+init   [name]                   Initialize a project.
+build                           Build the project in the current directory, if no path is specified.
+run                             Build and run the project in the current directory, if no path is specified.
+search [name]                   Search the package index for a particular package.
+help                            Show this message.
+  """
+
 proc main() {.inline.} =
   initNeoState()
 
@@ -201,8 +222,13 @@ proc main() {.inline.} =
     runPackageCommand(args)
   of "search":
     searchPackageCommand(args)
+  of "help":
+    showHelpCommand()
   else:
-    error "invalid command <red>`" & args.command & "`<reset>"
+    if args.command.len < 1:
+      showHelpCommand()
+    else:
+      error "invalid command <red>`" & args.command & "`<reset>"
 
   saveNeoState()
 
