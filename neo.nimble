@@ -10,7 +10,6 @@ bin = @["neo"]
 # Dependencies
 
 requires "nim >= 2.2.0"
-requires "zippy >= 0.10.16"
 requires "curly >= 1.1.1"
 requires "noise >= 0.1.10"
 requires "yaml >= 2.1.1"
@@ -18,5 +17,4 @@ requires "semver >= 1.2.3"
 requires "jsony >= 1.1.5"
 requires "shakar >= 0.1.0"
 requires "floof >= 1.0.0"
-
 requires "leveldb >= 0.4.1"

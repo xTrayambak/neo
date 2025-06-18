@@ -7,7 +7,6 @@ toolchain:
   version: 2.2.4
 
 dependencies:
-  - "zippy"
   - "curly"
   - "noise"
   - "yaml"

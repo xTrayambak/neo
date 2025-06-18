@@ -8,6 +8,12 @@ type
     Library
     Hybrid
 
+  PackageRef* = object
+    ## A package ref is an unresolved reference to a package.
+    ## It must be solved by Neo at buildtime for compilation
+    ## to commence.
+    name*: string
+
   Project* = object
     name*: string
     backend*: Backend
@@ -15,6 +21,15 @@ type
     kind*: ProjectKind
     binaries*: seq[string]
     toolchain*: Toolchain
+    dependencies*: seq[string]
+
+func getDependencies*(project: Project): seq[PackageRef] =
+  var res = newSeq[PackageRef](project.dependencies.len)
+
+  for i, dep in project.dependencies:
+    res[i] = PackageRef(name: dep)
+
+  move(res)
 
 func newProject*(
     name: string, license: string, kind: ProjectKind, toolchain: Toolchain

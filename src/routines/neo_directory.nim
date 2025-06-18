@@ -1,7 +1,6 @@
 ## Everything to do with the Neo (~/.local/share/neo) directory
-## Everything (and I mean it when I say everything) is compressed here, just to be conservative.
 import std/[os]
-import pkg/[zippy, curly, shakar]
+import pkg/[curly, shakar]
 import ../[argparser]
 
 const
@@ -31,6 +30,7 @@ proc populateNeoDir*(directory: string) =
   ## it to function as intended.
   
   discard existsOrCreateDir(directory / "indices")
+  discard existsOrCreateDir(directory / "packages")
 
 proc initNeoDir*(input: Input = default(Input)) =
   let directory = getNeoDir(input)

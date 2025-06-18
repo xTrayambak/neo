@@ -3,7 +3,7 @@ import std/[os, osproc, tables, sequtils, strutils]
 import pkg/[semver, shakar, floof]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
-import ./routines/[initialize, package_lists, state]
+import ./routines/[initialize, package_lists, state, dependencies]
 
 const
   NeoVersion* {.strdefine: "NimblePkgVersion".} = "0.1.0"
@@ -54,7 +54,7 @@ proc buildPackageCommand(args: Input) {.noReturn.} =
     error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
     quit(QuitFailure)
 
-  let project = loadProject(sourceFile)
+  var project = loadProject(sourceFile)
   
   if project.binaries.len < 1:
     error "This project has no compilable binaries."
@@ -69,6 +69,12 @@ proc buildPackageCommand(args: Input) {.noReturn.} =
   for switch in args.switches:
     extraFlags &= "--" & switch
   
+  try:
+    project.solveDependencies()
+  except CatchableError as exc:
+    error "Failed to solve dependencies: " & exc.msg
+    quit(1)
+
   for binFile in project.binaries:
     displayMessage("<yellow>compiling<reset>", "<green>" & binFile & "<reset> using the <blue>" & project.backend.toHumanString() & "<reset> backend")
     let stats = toolchain.compile(project.backend, directory / binFile & ".nim", CompilationOptions(outputFile: binFile, extraFlags: extraFlags))
