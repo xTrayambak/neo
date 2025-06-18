@@ -17,3 +17,5 @@ dependencies:
   - "floof"
   - "pretty"
   - "leveldb"
+
+formatter: nph

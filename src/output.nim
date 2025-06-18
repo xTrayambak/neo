@@ -58,8 +58,15 @@ proc askQuestion*(question: string, default: string = ""): string =
   displayMessage("<yellow>question<reset>", question)
 
   var noise = Noise.init()
-  let prompt =
-    Styler.init(fgYellow, "Answer", resetStyle, if default.len > 0: " (defaults to " & default & "): " else: ": ")
+  let prompt = Styler.init(
+    fgYellow,
+    "Answer",
+    resetStyle,
+    if default.len > 0:
+      " (defaults to " & default & "): "
+    else:
+      ": ",
+  )
   noise.setPrompt(prompt)
 
   if not noise.readLine():

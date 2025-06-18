@@ -21,7 +21,8 @@ type NimbleFileInfo* = object
   bin*: Table[string, string]
   hasInstallHooks*: bool
   hasErrors*: bool
-  nestedRequires*: bool #if true, the requires section contains nested requires meaning that the package is incorrectly defined
+  nestedRequires*: bool
+    #if true, the requires section contains nested requires meaning that the package is incorrectly defined
   declarativeParserErrorLines*: seq[string]
   #In vnext this means that we will need to re-run sat after selecting nim to get the correct requires
 
@@ -47,11 +48,20 @@ proc collectRequiresFromNode(n: PNode, result: var seq[string]) =
   else:
     discard
 
-proc validateNoNestedRequires(nfl: var NimbleFileInfo, n: PNode, conf: ConfigRef, hasErrors: var bool, nestedRequires: var bool, inControlFlow: bool = false) =
+proc validateNoNestedRequires(
+    nfl: var NimbleFileInfo,
+    n: PNode,
+    conf: ConfigRef,
+    hasErrors: var bool,
+    nestedRequires: var bool,
+    inControlFlow: bool = false,
+) =
   case n.kind
   of nkStmtList, nkStmtListExpr:
     for child in n:
-      validateNoNestedRequires(nfl, child, conf, hasErrors, nestedRequires, inControlFlow)
+      validateNoNestedRequires(
+        nfl, child, conf, hasErrors, nestedRequires, inControlFlow
+      )
   of nkWhenStmt, nkIfStmt, nkIfExpr, nkElifBranch, nkElse, nkElifExpr, nkElseExpr:
     for child in n:
       validateNoNestedRequires(nfl, child, conf, hasErrors, nestedRequires, true)
@@ -59,12 +69,15 @@ proc validateNoNestedRequires(nfl: var NimbleFileInfo, n: PNode, conf: ConfigRef
     if n[0].kind == nkIdent and n[0].ident.s == "requires":
       if inControlFlow:
         nestedRequires = true
-        let errorLine = &"{nfl.nimbleFile}({n.info.line}, {n.info.col}) 'requires' cannot be nested inside control flow statements"
+        let errorLine =
+          &"{nfl.nimbleFile}({n.info.line}, {n.info.col}) 'requires' cannot be nested inside control flow statements"
         nfl.declarativeParserErrorLines.add errorLine
         hasErrors = true
     else:
       for child in n:
-        validateNoNestedRequires(nfl, child, conf, hasErrors, nestedRequires, inControlFlow)
+        validateNoNestedRequires(
+          nfl, child, conf, hasErrors, nestedRequires, inControlFlow
+        )
   else:
     discard
 
@@ -76,18 +89,22 @@ proc extractSeqLiteral(n: PNode, conf: ConfigRef, varName: string): seq[string] 
         if item.kind in {nkStrLit .. nkTripleStrLit}:
           result.add item.strVal
         else:
-          localError(conf, item.info, &"'{varName}' sequence items must be string literals")
+          localError(
+            conf, item.info, &"'{varName}' sequence items must be string literals"
+          )
     else:
       localError(conf, n.info, &"'{varName}' must be assigned a sequence of strings")
   else:
     localError(conf, n.info, &"'{varName}' must be assigned a sequence with @ prefix")
 
-proc extractFeatures(featureNode: PNode, conf: ConfigRef, hasErrors: var bool, nestedRequires: var bool): seq[string] =
+proc extractFeatures(
+    featureNode: PNode, conf: ConfigRef, hasErrors: var bool, nestedRequires: var bool
+): seq[string] =
   ## Extracts requirements from a feature declaration
   if featureNode.kind in {nkStmtList, nkStmtListExpr}:
     for stmt in featureNode:
-      if stmt.kind in nkCallKinds and stmt[0].kind == nkIdent and 
-         stmt[0].ident.s == "requires":
+      if stmt.kind in nkCallKinds and stmt[0].kind == nkIdent and
+          stmt[0].ident.s == "requires":
         var requires: seq[string]
         collectRequiresFromNode(stmt, requires)
         result.add requires
@@ -108,12 +125,14 @@ proc extract(n: PNode, conf: ConfigRef, result: var NimbleFileInfo) =
           let featureName = n[1].strVal
           if not result.features.hasKey(featureName):
             result.features[featureName] = @[]
-          result.features[featureName] = extractFeatures(n[2], conf, result.hasErrors, result.nestedRequires)
+          result.features[featureName] =
+            extractFeatures(n[2], conf, result.hasErrors, result.nestedRequires)
       of "dev":
         let featureName = "dev"
         if not result.features.hasKey(featureName):
           result.features[featureName] = @[]
-        result.features[featureName] = extractFeatures(n[1], conf, result.hasErrors, result.nestedRequires)
+        result.features[featureName] =
+          extractFeatures(n[1], conf, result.hasErrors, result.nestedRequires)
       of "task":
         if n.len >= 3 and n[1].kind == nkIdent and
             n[2].kind in {nkStrLit .. nkTripleStrLit}:
@@ -141,9 +160,9 @@ proc extract(n: PNode, conf: ConfigRef, result: var NimbleFileInfo) =
       for bin in binSeq:
         when defined(windows):
           var bin = bin & ".exe"
-          result.bin[bin] = bin 
+          result.bin[bin] = bin
         else:
-          result.bin[bin] = bin        
+          result.bin[bin] = bin
     else:
       discard
   else:
@@ -161,7 +180,7 @@ proc getNimCompilationPath*(nimbleFile: string): string =
   conf.notes = {}
   conf.mainPackageNotes = {}
   conf.errorMax = high(int)
-  
+
   let fileIdx = fileInfoIdx(conf, AbsoluteFile nimbleFile)
   var parser: Parser
   var includePath = ""
@@ -174,16 +193,16 @@ proc getNimCompilationPath*(nimbleFile: string): string =
           findIncludePath(child)
       of nkIncludeStmt:
         # Found an include statement
-        if n.len > 0 and n[0].kind in {nkStrLit..nkTripleStrLit}:
+        if n.len > 0 and n[0].kind in {nkStrLit .. nkTripleStrLit}:
           includePath = n[0].strVal
           # echo "Found include: ", includePath
       else:
-        for i in 0..<n.safeLen:
+        for i in 0 ..< n.safeLen:
           findIncludePath(n[i])
-    
+
     findIncludePath(ast)
     closeParser(parser)
-  
+
   if includePath.len > 0:
     if includePath.contains("compilation.nim"):
       result = nimbleFile.parentDir / includePath
@@ -192,24 +211,24 @@ proc extractNimVersion*(nimbleFile: string): string =
   ## Extracts Nim version numbers from the system's compilation.nim file
   ## using the compiler API.
   var compilationPath = getNimCompilationPath(nimbleFile)
-  
+
   if not fileExists(compilationPath):
-    return ""  
+    return ""
   # Now parse the compilation.nim file to get version numbers
   var major, minor, patch = 0
-  
+
   var conf = newConfigRef()
   conf.foreignPackageNotes = {}
   conf.notes = {}
   conf.mainPackageNotes = {}
   conf.errorMax = high(int)
-  
+
   let compFileIdx = fileInfoIdx(conf, AbsoluteFile compilationPath)
   var parser: Parser
 
   if setupParser(parser, compFileIdx, newIdentCache(), conf):
     let ast = parseAll(parser)
-    
+
     # Process AST to find NimMajor, NimMinor, NimPatch definitions
     proc processNode(n: PNode) =
       case n.kind
@@ -232,23 +251,27 @@ proc extractNimVersion*(nimbleFile: string): string =
                 identName = child[0][0].ident.s
               elif child[0][0].kind == nkPostfix and child[0][0][1].kind == nkIdent:
                 identName = child[0][0][1].ident.s
-            else: discard
-              # echo "Unhandled node kind for const name: ", child[0].kind
+            else:
+              discard # echo "Unhandled node kind for const name: ", child[0].kind
             # Extract value
             if child.len > 2:
               case child[2].kind
               of nkIntLit:
                 let value = child[2].intVal.int
                 case identName
-                of "NimMajor": major = value
-                of "NimMinor": minor = value
-                of "NimPatch": patch = value
-                else: discard
+                of "NimMajor":
+                  major = value
+                of "NimMinor":
+                  minor = value
+                of "NimPatch":
+                  patch = value
+                else:
+                  discard
               else:
                 discard
       else:
         discard
-    
+
     processNode(ast)
     closeParser(parser)
   # echo "Extracted version: ", major, ".", minor, ".", patch

@@ -4,14 +4,9 @@
 ## similar to how Nimble has a SAT solver.
 import std/[os, options, strutils]
 import pkg/shakar
-import ../types/[
-  project, package_lists
-]
-import ../routines/[
-    package_lists,
-    git,
-    neo_directory
-  ],
+import ../types/[project, package_lists]
+import
+  ../routines/[package_lists, git, neo_directory],
   ../routines/nimble/declarativeparser,
   ../output
 
@@ -68,16 +63,16 @@ proc getDepPaths*(deps: seq[Dependency]): seq[string] =
 
     let base = getDirectoryForPackage(dep.project.name)
     paths &= base
-    
+
     if dirExists(base / "src"):
       paths &= base / "src"
-    
+
     paths &= getDepPaths(dep.deps)
 
   move(paths)
 
 proc downloadPackage*(entry: PackageListItem, pkg: PackageRef) =
-  let 
+  let
     meth = entry.`method`
     dest = getDirectoryForPackage(pkg.name)
 
@@ -85,9 +80,8 @@ proc downloadPackage*(entry: PackageListItem, pkg: PackageRef) =
   of "git":
     if not gitClone(entry.url, dest):
       raise newException(
-        CloneFailed, 
-        "Failed to clone repository for dependency <blue>" &
-        pkg.name & "<reset>!"
+        CloneFailed,
+        "Failed to clone repository for dependency <blue>" & pkg.name & "<reset>!",
       )
 
     displayMessage("<green>Downloaded<reset>", pkg.name)
@@ -113,14 +107,14 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
 
   if !package:
     packageNotFound(dep.name)
-  
+
   # If the package is found, then we can
   # clone it via Git
   let pkg = &package
 
   if not isDepInstalled(dep):
     downloadPackage(pkg, dep)
-  
+
   # Now, we'll load up a Neo project if it exists for that project.
   # TODO: Load .nimble files as projects too, atleast for now.
   let
@@ -132,15 +126,18 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
     hasAnyManifest = neoFileExists or *nimbleFilePath
 
   if not hasAnyManifest:
-    displayMessage("<yellow>warning<reset>", "<green>" & dep.name & "<reset> does not have a `<blue>neo.yml<reset>` or `<blue>.nimble<reset>` file. Its dependencies will not be resolved.")
+    displayMessage(
+      "<yellow>warning<reset>",
+      "<green>" & dep.name &
+        "<reset> does not have a `<blue>neo.yml<reset>` or `<blue>.nimble<reset>` file. Its dependencies will not be resolved.",
+    )
     return
-  
+
   if neoFileExists:
     var project = loadProject(neoFilePath)
     var dependency = Dependency()
     for childDep in dependency.project.getDependencies():
-      dependency.deps &=
-        handleDep(cache, project, childDep)
+      dependency.deps &= handleDep(cache, project, childDep)
 
     dependency.project = project
     return move(dependency)
@@ -150,12 +147,12 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
     var dependency = Dependency()
     var project = Project(name: dep.name)
     for req in info.requires:
-      dependency.deps &=
-        handleDep(cache, project, PackageRef(name: req.split(' ')[0]))
-    
+      dependency.deps &= handleDep(cache, project, PackageRef(name: req.split(' ')[0]))
+
     dependency.project = project
     return move(dependency)
-  else: unreachable
+  else:
+    unreachable
 
 proc solveDependencies*(project: var Project): seq[Dependency] =
   # Prime-up the cache.
@@ -164,9 +161,8 @@ proc solveDependencies*(project: var Project): seq[Dependency] =
   # we'll eventually add a config option
   # to add other lists.
   var cache: SolverCache
-  cache.lists &=
-    &lazilyFetchPackageList(DefaultPackageList)
-  
+  cache.lists &= &lazilyFetchPackageList(DefaultPackageList)
+
   var dependencyVec: seq[Dependency]
   for dep in project.getDependencies():
     let dep = handleDep(cache, project, dep)

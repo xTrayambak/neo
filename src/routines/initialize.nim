@@ -1,8 +1,7 @@
 import std/[os, streams, strutils]
 import pkg/[yaml]
 import ../types/[project]
-import ../[output],
-       ./git
+import ../[output], ./git
 
 proc initializeProject*(project: Project) =
   displayMessage("<blue>initializing<reset>", "project " & project.name)
@@ -24,7 +23,7 @@ proc main {.inline.} =
   quit(QuitSuccess)
 
 when isMainModule: main()
-      """
+      """,
     )
     project.binaries = @[project.name]
   of ProjectKind.Library:
@@ -42,7 +41,8 @@ proc greet*(name: string) =
   echo "Greetings from $1, " & name
 
 export submodule
-""" % [project.name]
+""" %
+        [project.name],
     )
     writeFile(
       project.name / "src" / project.name / "submodule.nim",
@@ -52,14 +52,19 @@ export submodule
 
 proc greetInHindi*(name: string) =
   echo "$1 se namaste, " & name
-""" % [project.name]
+""" %
+        [project.name],
     )
   of ProjectKind.Hybrid:
-    assert off, "I hate you and everything you stand for" # TODO: implement this, I'm too lazy
-  
+    assert off, "I hate you and everything you stand for"
+      # TODO: implement this, I'm too lazy
+
   var stream = newFileStream(project.name / "neo.yml", fmWrite)
   Dumper().dump(project, stream)
   stream.close()
 
   if not gitInit(project.name):
-    displayMessage("<yellow>warning<reset>", "Failed to initialize Git repository for your new project.")
+    displayMessage(
+      "<yellow>warning<reset>",
+      "Failed to initialize Git repository for your new project.",
+    )

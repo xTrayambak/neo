@@ -7,9 +7,10 @@ type
 
   Toolchain* {.ignore: ["cachedNimPath"].} = object
     version*: string
-    cachedNimPath* {.defaultVal: none(string).} : Option[string]
+    cachedNimPath* {.defaultVal: none(string).}: Option[string]
 
-func getVersion*(toolchain: Toolchain): Version = toolchain.version.parseVersion()
+func getVersion*(toolchain: Toolchain): Version =
+  toolchain.version.parseVersion()
 
 proc findNimExe*(toolchain: var Toolchain) {.sideEffect.} =
   if *toolchain.cachedNimPath:
@@ -21,15 +22,17 @@ proc findNimExe*(toolchain: var Toolchain) {.sideEffect.} =
     # Run `nim -v`
     let
       output = execCmdEx(nim & " -v").output
-      
+
       # Nim Compiler Version 2.0.4 [Linux: amd64]
       # Compiled at 2024-03-28
       # Copyright (c) 2006-2023 by Andreas Rumpf
-      # 
+      #
       # git hash: b47747d31844c6bd9af4322efe55e24fefea544c
       # active boot switches: -d:release
       version = parseVersion(
-        output.splitLines()[0].split("Nim Compiler Version ")[1].split(" [Linux: amd64]")[0]
+        output.splitLines()[0].split("Nim Compiler Version ")[1].split(
+          " [Linux: amd64]"
+        )[0]
       )
 
     if version == toolchain.getVersion():
@@ -41,9 +44,15 @@ proc findNimExe*(toolchain: var Toolchain) {.sideEffect.} =
   assert off, "Unreachable/Not implemented"
 
 proc invoke*(
-  toolchain: var Toolchain,
-  command: string
-): bool {.tags: [NimInvokation, ReadEnvEffect, ReadDirEffect, ReadIOEffect, ExecIOEffect, RootEffect], discardable, sideEffect.} =
+    toolchain: var Toolchain, command: string
+): bool {.
+    tags: [
+      NimInvokation, ReadEnvEffect, ReadDirEffect, ReadIOEffect, ExecIOEffect,
+      RootEffect,
+    ],
+    discardable,
+    sideEffect
+.} =
   if *toolchain.cachedNimPath:
     return execCmd(&toolchain.cachedNimPath & ' ' & command) == 0
 
@@ -51,13 +60,15 @@ proc invoke*(
   toolchain.invoke(command)
 
 proc compile*(
-  toolchain: var Toolchain,
-  backend: Backend,
-  file: string,
-  options: CompilationOptions
+    toolchain: var Toolchain,
+    backend: Backend,
+    file: string,
+    options: CompilationOptions,
 ): CompilationStatistics =
   toolchain.findNimExe()
-  let payload = "script /dev/null -q -c '" & &toolchain.cachedNimPath & ' ' & ($backend & ' ' & $options & ' ' & file) & '\''
+  let payload =
+    "script /dev/null -q -c '" & &toolchain.cachedNimPath & ' ' &
+    ($backend & ' ' & $options & ' ' & file) & '\''
 
   let res = execCmdEx(payload)
   var output = res.output.splitLines()
@@ -65,9 +76,9 @@ proc compile*(
   for line in output:
     if line.startsWith("CC: "):
       continue # Don't print out the Nim CC debug lines
-    
+
     echo line
-  
+
   var stats: CompilationStatistics
   stats.unitsCompiled = uint(res.output.count("CC: "))
   stats.successful = res.exitCode == 0

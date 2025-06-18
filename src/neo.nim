@@ -27,8 +27,7 @@ proc initializePackageCommand(args: Input) {.noReturn.} =
     name = args.arguments[0]
     kind = askQuestion("Project Type", ["Binary", "Library", "Hybrid"], 0)
     license = askQuestion("License (Optional)")
-    toolchainVersion =
-      askQuestion("Nim Toolchain Version", NimVersion)
+    toolchainVersion = askQuestion("Nim Toolchain Version", NimVersion)
 
     project = newProject(
       name = name,
@@ -55,7 +54,7 @@ proc buildPackageCommand(args: Input) {.noReturn.} =
     quit(QuitFailure)
 
   var project = loadProject(sourceFile)
-  
+
   if project.binaries.len < 1:
     error "This project has no compilable binaries."
     quit(QuitFailure)
@@ -68,7 +67,7 @@ proc buildPackageCommand(args: Input) {.noReturn.} =
 
   for switch in args.switches:
     extraFlags &= "--" & switch
-  
+
   var deps: seq[Dependency]
   try:
     deps = project.solveDependencies()
@@ -77,17 +76,35 @@ proc buildPackageCommand(args: Input) {.noReturn.} =
     quit(1)
 
   for binFile in project.binaries:
-    displayMessage("<yellow>compiling<reset>", "<green>" & binFile & "<reset> using the <blue>" & project.backend.toHumanString() & "<reset> backend")
-    let stats = toolchain.compile(project.backend, directory / binFile & ".nim", CompilationOptions(outputFile: binFile, extraFlags: extraFlags, appendPaths: getDepPaths(deps)))
+    displayMessage(
+      "<yellow>compiling<reset>",
+      "<green>" & binFile & "<reset> using the <blue>" & project.backend.toHumanString() &
+        "<reset> backend",
+    )
+    let stats = toolchain.compile(
+      project.backend,
+      directory / binFile & ".nim",
+      CompilationOptions(
+        outputFile: binFile, extraFlags: extraFlags, appendPaths: getDepPaths(deps)
+      ),
+    )
 
     if stats.successful:
-      displayMessage("<green>" & binFile & "<reset>", "was built successfully, with <green>" & $stats.unitsCompiled & "<reset> unit(s) compiled.")
+      displayMessage(
+        "<green>" & binFile & "<reset>",
+        "was built successfully, with <green>" & $stats.unitsCompiled &
+          "<reset> unit(s) compiled.",
+      )
     else:
-      displayMessage("<red>" & binFile & "<reset>", "has failed to compile. Check the error above for more information.")
-      break # TODO: add a flag called `--ignore-build-failure` which doesn't cause the entire build process to stop after an error
+      displayMessage(
+        "<red>" & binFile & "<reset>",
+        "has failed to compile. Check the error above for more information.",
+      )
+      break
+        # TODO: add a flag called `--ignore-build-failure` which doesn't cause the entire build process to stop after an error
 
 proc runPackageCommand(args: Input) =
-  var 
+  var
     directory = "src"
     firstArgumentUsed = false
 
@@ -104,23 +121,20 @@ proc runPackageCommand(args: Input) =
     quit(QuitFailure)
 
   var project = loadProject(sourceFile)
-  let
-    binaryName = block:
-      if project.binaries.len > 1:
-        let pos =
-          if firstArgumentUsed: 1
-          else: 0
+  let binaryName = block:
+    if project.binaries.len > 1:
+      let pos = if firstArgumentUsed: 1 else: 0
 
-        if args.arguments.len < pos:
-          error "Expected binary file to run. Choose between the following:"
-          for bin in project.binaries:
-            displayMessage("", "<green>" & bin & "<reset>")
+      if args.arguments.len < pos:
+        error "Expected binary file to run. Choose between the following:"
+        for bin in project.binaries:
+          displayMessage("", "<green>" & bin & "<reset>")
 
-          quit(QuitFailure)
+        quit(QuitFailure)
 
-        args.arguments[pos]
-      else:
-        project.binaries[0]
+      args.arguments[pos]
+    else:
+      project.binaries[0]
 
   var toolchain = newToolchain(project.toolchain.version)
 
@@ -131,11 +145,23 @@ proc runPackageCommand(args: Input) =
     error "Failed to solve dependencies: " & exc.msg
     quit(1)
 
-  displayMessage("<yellow>compiling<reset>", "<green>" & binaryName & "<reset> using the <blue>" & project.backend.toHumanString() & "<reset> backend")
-  
-  let stats = toolchain.compile(project.backend, directory / binaryName & ".nim", CompilationOptions(outputFile: binaryName, appendPaths: getDepPaths(deps)))
+  displayMessage(
+    "<yellow>compiling<reset>",
+    "<green>" & binaryName & "<reset> using the <blue>" & project.backend.toHumanString() &
+      "<reset> backend",
+  )
+
+  let stats = toolchain.compile(
+    project.backend,
+    directory / binaryName & ".nim",
+    CompilationOptions(outputFile: binaryName, appendPaths: getDepPaths(deps)),
+  )
   if stats.successful:
-    displayMessage("<green>" & binaryName & "<reset>", "was built successfully, with <green>" & $stats.unitsCompiled & "<reset> unit(s) compiled.")
+    displayMessage(
+      "<green>" & binaryName & "<reset>",
+      "was built successfully, with <green>" & $stats.unitsCompiled &
+        "<reset> unit(s) compiled.",
+    )
 
     var extraFlags: string
     for flag, value in args.flags:
@@ -143,24 +169,29 @@ proc runPackageCommand(args: Input) =
 
     for switch in args.switches:
       extraFlags &= "--" & switch
-    
+
     discard execCmd("./" & binaryName & ' ' & extraFlags)
   else:
-    displayMessage("<red>" & binaryName & "<reset>", "has failed to compile. Check the error above for more information.")
+    displayMessage(
+      "<red>" & binaryName & "<reset>",
+      "has failed to compile. Check the error above for more information.",
+    )
 
 proc searchPackageCommand(args: Input) =
   if args.arguments.len < 1:
-    displayMessage("<red>error<reset>", "This command expects one argument. It was provided none.")
+    displayMessage(
+      "<red>error<reset>", "This command expects one argument. It was provided none."
+    )
     quit(1)
 
   let package = args.arguments[0]
   let list = lazilyFetchPackageList(DefaultPackageList)
-  
+
   if !list:
     # TODO: better errors
     displayMessage("<red>error<reset>", "Failed to fetch package index!")
     quit(1)
-  
+
   let index = &list
 
   stdout.write('\n')
@@ -169,7 +200,7 @@ proc searchPackageCommand(args: Input) =
 
   if args.flagAsInt("limit") ?= customLimit:
     limit = customLimit
-  
+
   let pkgs = block:
     var res = newSeq[string](index.len)
     for i, pkg in index:
@@ -187,16 +218,20 @@ proc searchPackageCommand(args: Input) =
       continue
 
     displayMessage("<green>" & pkg.text & "<reset>", package.description)
-  
+
   if limit < results.len:
     stdout.write('\n')
-    displayMessage("<blue>...<reset>", "and <green>" & $(results.len - limit) & "<reset> packages more (use --limit:<N> to see more)")
+    displayMessage(
+      "<blue>...<reset>",
+      "and <green>" & $(results.len - limit) &
+        "<reset> packages more (use --limit:<N> to see more)",
+    )
 
   # stdout.write('\n')
   # displayMessage("<yellow>tip<reset>", "To get more information on a particular package, run `<blue>neo info <package><reset>`")
 
 proc installPackageCommand(args: Input) =
-  var 
+  var
     directory = "src"
     firstArgumentUsed = false
 
@@ -225,18 +260,30 @@ proc installPackageCommand(args: Input) =
   except CatchableError as exc:
     error "Failed to solve dependencies: " & exc.msg
     quit(1)
-  
+
   var fail = false
   for binaryName in project.binaries:
-    displayMessage("<yellow>compiling<reset>", "<green>" & binaryName & "<reset> using the <blue>" & project.backend.toHumanString() & "<reset> backend")
-    
-    let stats = toolchain.compile(project.backend, directory / binaryName & ".nim", CompilationOptions(
-      outputFile: getNeoDir() / "bin" / binaryName,
-      extraFlags: "--define:release --define:speed",
-      appendPaths: getDepPaths(deps))
+    displayMessage(
+      "<yellow>compiling<reset>",
+      "<green>" & binaryName & "<reset> using the <blue>" &
+        project.backend.toHumanString() & "<reset> backend",
+    )
+
+    let stats = toolchain.compile(
+      project.backend,
+      directory / binaryName & ".nim",
+      CompilationOptions(
+        outputFile: getNeoDir() / "bin" / binaryName,
+        extraFlags: "--define:release --define:speed",
+        appendPaths: getDepPaths(deps),
+      ),
     )
     if stats.successful:
-      displayMessage("<green>" & binaryName & "<reset>", "was built successfully, with <green>" & $stats.unitsCompiled & "<reset> unit(s) compiled.")
+      displayMessage(
+        "<green>" & binaryName & "<reset>",
+        "was built successfully, with <green>" & $stats.unitsCompiled &
+          "<reset> unit(s) compiled.",
+      )
 
       var extraFlags: string
       for flag, value in args.flags:
@@ -245,7 +292,10 @@ proc installPackageCommand(args: Input) =
       for switch in args.switches:
         extraFlags &= "--" & switch
     else:
-      displayMessage("<red>" & binaryName & "<reset>", "has failed to compile. Check the error above for more information.")
+      displayMessage(
+        "<red>" & binaryName & "<reset>",
+        "has failed to compile. Check the error above for more information.",
+      )
       fail = true
       break
 
@@ -253,16 +303,74 @@ proc installPackageCommand(args: Input) =
     error "One or more binaries have failed to compile. Check the error(s) above for more information."
     quit(QuitFailure)
 
-  displayMessage("<green>Installed<reset>", $project.binaries.len & " binar" & (if project.binaries.len == 1: "y" else: "ies") & " successfully.")
-  displayMessage("<yellow>warning<reset>", "Make sure to add " & (getNeoDir() / "bin") & " to your <blue>PATH<reset> environment variable to run these binaries.")
+  displayMessage(
+    "<green>Installed<reset>",
+    $project.binaries.len & " binar" & (if project.binaries.len == 1: "y" else: "ies") &
+      " successfully.",
+  )
+  displayMessage(
+    "<yellow>warning<reset>",
+    "Make sure to add " & (getNeoDir() / "bin") &
+      " to your <blue>PATH<reset> environment variable to run these binaries.",
+  )
 
 proc syncIndicesCommand(args: Input) =
   discard fetchPackageList(DefaultPackageList)
   setLastIndexSyncTime(epochTime())
 
+proc formatProjectCommand(args: Input) =
+  # TODO: Global formatter settings that'd live in the user's config
+  # at `~/.config/neo/config.yml`. Implement this when the config stuff
+  # is implemented.
+  var
+    directory = "src"
+    firstArgumentUsed = false
+
+  let sourceFile =
+    if args.arguments.len > 0:
+      directory = args.arguments[0] / "src"
+      firstArgumentUsed = true
+      args.arguments[0] / "neo.yml"
+    else:
+      getCurrentDir() / "neo.yml"
+
+  if not fileExists(sourceFile):
+    error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
+    quit(QuitFailure)
+
+  let project = loadProject(sourceFile)
+  let executable = findExe(project.formatter)
+
+  if executable.len < 1:
+    error "The formatter <blue>" & project.formatter & "<reset> was not found."
+    error "Are you sure that it is installed and in your system's <blue>PATH<reset>?"
+    quit(QuitFailure)
+
+  displayMessage(
+    "<blue>Formatting<reset>",
+    project.name & " via <green>" & project.formatter & "<reset>",
+  )
+
+  let code = (
+    case project.formatter
+    of "nimpretty", "nph":
+      execCmd(executable & ' ' & getCurrentDir())
+    else:
+      error "Unknown formatter: <red>" & project.formatter & "<reset>."
+      error "Formatters recognized by Neo are: <blue>nph<reset> and <blue>nimpretty<reset>."
+      -1
+  )
+
+  if code != 0:
+    error "The formatter <red>" & project.formatter &
+      "<reset> exited with a non-zero exit code (" & $code & ')'
+    quit(QuitFailure)
+
 proc showHelpCommand() {.noReturn, sideEffect.} =
   echo "Neo is a package manager for Nim"
-  displayMessage("<green>Usage<reset>", "neo <yellow>[command]<reset> <blue>[args]<reset>")
+  displayMessage(
+    "<green>Usage<reset>", "neo <yellow>[command]<reset> <blue>[args]<reset>"
+  )
 
   echo """
 
@@ -295,6 +403,8 @@ proc main() {.inline.} =
     installPackageCommand(args)
   of "sync":
     syncIndicesCommand(args)
+  of "fmt":
+    formatProjectCommand(args)
   else:
     if args.command.len < 1:
       showHelpCommand()

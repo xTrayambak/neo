@@ -23,6 +23,8 @@ type
     toolchain*: Toolchain
     dependencies*: seq[string]
 
+    formatter* {.defaultVal: "nimpretty".}: string
+
 func getDependencies*(project: Project): seq[PackageRef] =
   var res = newSeq[PackageRef](project.dependencies.len)
 
@@ -36,8 +38,6 @@ func newProject*(
 ): Project {.inline.} =
   Project(name: name, license: license, kind: kind, toolchain: toolchain)
 
-proc loadProject*(
-  file: string
-): Project {.inline, sideEffect.} =
+proc loadProject*(file: string): Project {.inline, sideEffect.} =
   var stream = newFileStream(file, fmRead)
   stream.load(result)

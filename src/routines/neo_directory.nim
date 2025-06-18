@@ -3,10 +3,7 @@ import std/[os]
 import pkg/[curly, shakar]
 import ../[argparser]
 
-const
-  OfficialPackageLists* = [
-    "https://nim-lang.org/nimble/packages.json"
-  ]
+const OfficialPackageLists* = ["https://nim-lang.org/nimble/packages.json"]
 
 when defined(linux):
   proc getDataDir(): string =
@@ -28,7 +25,7 @@ proc getNeoDir*(input: Input = default(Input)): string =
 proc populateNeoDir*(directory: string) =
   ## "Populate" the Neo directory with everything needed for
   ## it to function as intended.
-  
+
   discard existsOrCreateDir(directory / "indices")
   discard existsOrCreateDir(directory / "packages")
   discard existsOrCreateDir(directory / "bin")

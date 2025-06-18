@@ -28,7 +28,7 @@ proc getLastIndexSyncTime*(): float64 =
   let value = state.get("last_index_sync_time")
   if !value:
     return 0'f64 # Force a resync as we've just init'd our state, probably.
-  
+
   parseFloat(&value)
 
 proc setLastIndexSyncTime*(value: float64) =

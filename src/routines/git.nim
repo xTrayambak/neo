@@ -19,10 +19,7 @@ proc gitClone*(url: string, dest: string, depth: uint = 1): bool =
   if dirExists(dest):
     removeDir(dest)
 
-  let (_, code) = execCmdEx(
-    git & " clone " & url & ' ' & dest &
-    " --depth=" & $depth
-  )
+  let (_, code) = execCmdEx(git & " clone " & url & ' ' & dest & " --depth=" & $depth)
 
   code == 0
 

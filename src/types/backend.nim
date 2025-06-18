@@ -1,9 +1,8 @@
-type
-  Backend* {.pure.} = enum
-    C
-    Cpp
-    JavaScript
-    ObjectiveC
+type Backend* {.pure.} = enum
+  C
+  Cpp
+  JavaScript
+  ObjectiveC
 
 func `$`*(backend: Backend): string =
   case backend
