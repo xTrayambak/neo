@@ -1,19 +1,37 @@
 ## Output manager
-import std/[strutils]
+import std/[strutils, posix]
 import pkg/[noise, semver]
 
-const ColorTable = {
-  "<green>": "\x1b[32m",
-  "<red>": "\x1b[38;5;1m",
-  "<yellow>": "\x1b[38;5;3m",
-  "<blue>": "\x1b[38;5;4m",
-  "<reset>": "\x1b[0m",
-}
+var hasColorSupport* {.global.} = isatty(stdout)
+
+const 
+  ColorTable = {
+    "<green>": "\x1b[32m",
+    "<red>": "\x1b[38;5;1m",
+    "<yellow>": "\x1b[38;5;3m",
+    "<blue>": "\x1b[38;5;4m",
+    "<reset>": "\x1b[0m",
+  }
+  ColorTableFallback = {
+    "<green>": "",
+    "<red>": "",
+    "<yellow>": "",
+    "<blue>": "",
+    "<reset>": ""
+  }
+
+proc colorTagSubs*(value: string): string {.inline.} =
+  value.multiReplace(
+    if hasColorSupport:
+      ColorTable
+    else:
+      ColorTableFallback
+  )
 
 proc displayMessage*(component: string, message: string) {.sideEffect.} =
   let
-    component = component.multiReplace(ColorTable)
-    message = message.multiReplace(ColorTable)
+    component = component.colorTagSubs()
+    message = message.colorTagSubs()
 
   stdout.write ' ' & component & "  " & message & '\n'
 
