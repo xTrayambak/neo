@@ -369,15 +369,17 @@ proc formatProjectCommand(args: Input) =
 proc showInfoCommand(args: Input) =
   # TODO: This should search all available lists once we have that working.
   if args.arguments.len > 1:
-    error "`<blue>neo info<reset>` expects exactly one argument, got " & $args.arguments.len & " instead."
-  
+    error "`<blue>neo info<reset>` expects exactly one argument, got " &
+      $args.arguments.len & " instead."
+
   case args.arguments.len
   of 1:
     let list = &lazilyFetchPackageList(DefaultPackageList)
     let package = list.find(args.arguments[0])
 
     if !package:
-      error "could not find `<red>" & args.arguments[0] & "<reset>` in registry `<blue>" & DefaultPackageList & "<reset>`"
+      error "could not find `<red>" & args.arguments[0] & "<reset>` in registry `<blue>" &
+        DefaultPackageList & "<reset>`"
       quit(QuitFailure)
 
     let pkg = &package
@@ -385,13 +387,14 @@ proc showInfoCommand(args: Input) =
     try:
       let path = getDirectoryForPackage(args.arguments[0]) / "neo.yml"
       if not fileExists(path):
-        error "The package `<red>" & args.arguments[0] & "<reset>` does not have a Neo manifest."
+        error "The package `<red>" & args.arguments[0] &
+          "<reset>` does not have a Neo manifest."
         error "It was likely made with Nimble in mind. As such, Neo cannot inspect it any further."
         quit(QuitFailure)
 
       let project = loadProject(path)
       var tags: string
-      
+
       for tag in pkg.tags:
         tags &= colorTagSubs("<blue>#" & tag & "<reset>")
 
@@ -409,22 +412,21 @@ proc showInfoCommand(args: Input) =
 
     let project = loadProject(path)
     echo colorTagSubs("<green>" & project.name & "<reset>\n")
-    echo colorTagSubs("<green>backend<reset>: " & project.backend.toHumanString & " (`" & $project.backend & "`)")
+    echo colorTagSubs(
+      "<green>backend<reset>: " & project.backend.toHumanString & " (`" &
+        $project.backend & "`)"
+    )
     echo colorTagSubs(
       "<green>license<reset>: " &
-      (
-        if project.license.len > 0:
-          project.license
-        else:
-          "<red>unknown<reset>"
-      )
+        (if project.license.len > 0: project.license else: "<red>unknown<reset>")
     )
-    
+
     if project.binaries.len > 0:
       echo colorTagSubs("<green>binaries<reset>:")
       for bin in project.binaries:
         echo colorTagSubs("  * <blue>" & bin & "<reset>")
-  else: unreachable
+  else:
+    unreachable
 
 proc showHelpCommand() {.noReturn, sideEffect.} =
   echo "Neo is a package manager for Nim"

@@ -71,7 +71,9 @@ proc getDepPaths*(deps: seq[Dependency]): seq[string] =
 
   move(paths)
 
-proc downloadPackage*(entry: PackageListItem, pkg: PackageRef, ignoreCache: bool = false) =
+proc downloadPackage*(
+    entry: PackageListItem, pkg: PackageRef, ignoreCache: bool = false
+) =
   let
     meth = entry.`method`
     dest = getDirectoryForPackage(pkg.name)

@@ -4,7 +4,7 @@ import pkg/[noise, semver]
 
 var hasColorSupport* {.global.} = isatty(stdout)
 
-const 
+const
   ColorTable = {
     "<green>": "\x1b[32m",
     "<red>": "\x1b[38;5;1m",
@@ -12,21 +12,11 @@ const
     "<blue>": "\x1b[38;5;4m",
     "<reset>": "\x1b[0m",
   }
-  ColorTableFallback = {
-    "<green>": "",
-    "<red>": "",
-    "<yellow>": "",
-    "<blue>": "",
-    "<reset>": ""
-  }
+  ColorTableFallback =
+    {"<green>": "", "<red>": "", "<yellow>": "", "<blue>": "", "<reset>": ""}
 
 proc colorTagSubs*(value: string): string {.inline.} =
-  value.multiReplace(
-    if hasColorSupport:
-      ColorTable
-    else:
-      ColorTableFallback
-  )
+  value.multiReplace(if hasColorSupport: ColorTable else: ColorTableFallback)
 
 proc displayMessage*(component: string, message: string) {.sideEffect.} =
   let
