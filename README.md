@@ -8,6 +8,27 @@ Neo is a new package manager for the [Nim programming language](https://nim-lang
 - Using modern algorithms since we're not scared of breaking things (like using SHA-256 for hashing)
 - Add infrastructure for "custom targets" like WASM
 
+# Roadmap
+- [X] Internal storage area (`~/.local/share/neo`)
+- [X] Package lists/indices (stored at `~/.local/share/neo/indices`)
+- [X] Internal state is stored as a LevelDB database (at `~/.local/share/neo/state`)
+- [X] `neo build` command
+- [X] `neo search` command
+- [X] `neo init` command
+- [X] `neo search` command
+- [X] Naive dependency solver
+- [ ] Proper dependency solver
+- [ ] Tasks
+- [ ] Hooks
+- [ ] Proper dependency management
+- [ ] `neo info` command
+
+# Building Neo
+Neo can be built using Neo itself, or via Nimble. To build it via itself, run:
+```
+$ neo build
+```
+
 # Dependencies
 - libcURL
 
