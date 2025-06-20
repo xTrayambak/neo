@@ -16,6 +16,8 @@ type NimbleFileInfo* = object
   requires*: seq[string]
   srcDir*: string
   version*: string
+  license*: string
+  backend*: string
   tasks*: seq[(string, string)]
   features*: Table[string, seq[string]]
   bin*: Table[string, string]
@@ -154,6 +156,18 @@ proc extract(n: PNode, conf: ConfigRef, result: var NimbleFileInfo) =
         result.version = n[1].strVal
       else:
         localError(conf, n[1].info, "assignments to 'version' must be string literals")
+        result.hasErrors = true
+    elif n[0].kind == nkIdent and eqIdent(n[0].ident.s, "license"):
+      if n[1].kind in {nkStrLit .. nkTripleStrLit}:
+        result.license = n[1].strVal
+      else:
+        localError(conf, n[1].info, "assignments to 'license' must be string literals")
+        result.hasErrors = true
+    elif n[0].kind == nkIdent and eqIdent(n[0].ident.s, "backend"):
+      if n[1].kind in {nkStrLit .. nkTripleStrLit}:
+        result.backend = n[1].strVal
+      else:
+        localError(conf, n[1].info, "assignments to 'backend' must be string literals")
         result.hasErrors = true
     elif n[0].kind == nkIdent and eqIdent(n[0].ident.s, "bin"):
       let binSeq = extractSeqLiteral(n[1], conf, "bin")

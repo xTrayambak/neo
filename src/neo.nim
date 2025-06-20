@@ -3,7 +3,9 @@ import std/[os, osproc, tables, sequtils, strutils, times]
 import pkg/[semver, shakar, floof, pretty]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
-import ./routines/[initialize, package_lists, state, dependencies, neo_directory]
+import
+  ./routines/[initialize, package_lists, state, dependencies, neo_directory],
+  ./routines/nimble/declarativeparser
 
 const
   NeoVersion* {.strdefine: "NimblePkgVersion".} = "0.1.0"
@@ -367,6 +369,31 @@ proc formatProjectCommand(args: Input) =
       "<reset> exited with a non-zero exit code (" & $code & ')'
     quit(QuitFailure)
 
+proc showInfoLegacyCommand(path: string, package: PackageListItem) =
+  let nimbleFilePath = findNimbleFile(path)
+  if !nimbleFilePath:
+    error "This package does not seem to have a `<blue>neo.yml<reset>` or a `<blue>.nimble<reset>` file."
+    error "Neo cannot display its information."
+    quit(QuitFailure)
+
+  let fileInfo = extractRequiresInfo(&nimbleFilePath)
+
+  var tags: seq[string]
+
+  for tag in package.tags:
+    tags &= colorTagSubs("<blue>#" & tag & "<reset>")
+
+  echo colorTagSubs("<green>" & package.name & "<reset> " & tags.join(" "))
+  echo package.description
+  echo colorTagSubs("<green>version:<reset> " & fileInfo.version.split(' ')[0])
+  echo colorTagSubs("<green>license:<reset> " & fileInfo.license)
+  try:
+    echo colorTagSubs(
+      "<green>backend:<reset> " & fileInfo.backend.toBackend().toHumanString()
+    )
+  except ValueError: discard
+  echo colorTagSubs("<green>documentation:<reset> " & package.web)
+
 proc showInfoCommand(args: Input) =
   # TODO: This should search all available lists once we have that working.
   if args.arguments.len > 1:
@@ -387,23 +414,34 @@ proc showInfoCommand(args: Input) =
     discard downloadPackage(pkg, PackageRef(name: args.arguments[0]))
 
     try:
-      let path = getDirectoryForPackage(args.arguments[0]) / "neo.yml"
+      let
+        base = getDirectoryForPackage(args.arguments[0])
+        path = base / "neo.yml"
       if not fileExists(path):
-        error "The package `<red>" & args.arguments[0] &
+        showInfoLegacyCommand(base, pkg)
+        displayMessage(
+          "<yellow>notice<reset>",
+          "This project only has a `<blue>.nimble<reset>` file. If you own it, consider adding a `<green>neo.yml<reset>` to it as well.",
+        )
+        return
+        #[ error "The package `<red>" & args.arguments[0] &
           "<reset>` does not have a Neo manifest."
         error "It was likely made with Nimble in mind. As such, Neo cannot inspect it any further."
-        quit(QuitFailure)
+        quit(QuitFailure) ]#
 
       let project = loadProject(path)
-      var tags: string
+      var tags: seq[string]
 
       for tag in pkg.tags:
         tags &= colorTagSubs("<blue>#" & tag & "<reset>")
 
-      echo colorTagSubs("<green>" & project.name & "<reset> " & tags.join())
+      echo colorTagSubs("<green>" & project.name & "<reset> " & tags.join(" "))
       echo pkg.description
+      echo colorTagSubs("<green>license:<reset> " & project.license)
+      echo colorTagSubs("<green>backend:<reset> " & project.backend.toHumanString())
+      echo colorTagSubs("<green>documentation:<reset> " & pkg.web)
     except:
-      error "Failed to load project manifest for `<red>" & args.arguments[0] & "<reset>."
+      error "Failed to load project manifest for `<red>" & args.arguments[0] & "`<reset>."
       error "Perhaps it depends on a Nimble file instead of a Neo file?"
       quit(QuitFailure)
   of 0:
