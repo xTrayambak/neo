@@ -18,8 +18,6 @@ requires "jsony >= 1.1.5"
 requires "shakar >= 0.1.0"
 requires "floof >= 1.0.0"
 requires "leveldb >= 0.4.1"
-
 requires "pretty >= 0.2.0"
 requires "compiler >= 2.2.4"
-
 requires "https://github.com/ferus-web/sanchar >= 2.0.2"
