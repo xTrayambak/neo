@@ -170,6 +170,7 @@ proc runPackageCommand(args: Input) =
     for switch in args.switches:
       extraFlags &= "--" & switch
 
+    saveNeoState()
     discard execCmd("./" & binaryName & ' ' & extraFlags)
   else:
     displayMessage(
@@ -383,7 +384,8 @@ proc showInfoCommand(args: Input) =
       quit(QuitFailure)
 
     let pkg = &package
-    downloadPackage(pkg, PackageRef(name: args.arguments[0]))
+    discard downloadPackage(pkg, PackageRef(name: args.arguments[0]))
+
     try:
       let path = getDirectoryForPackage(args.arguments[0]) / "neo.yml"
       if not fileExists(path):

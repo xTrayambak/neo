@@ -17,5 +17,6 @@ dependencies:
   - "floof"
   - "pretty"
   - "leveldb"
+  - "https://github.com/ferus-web/sanchar"
 
 formatter: nph

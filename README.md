@@ -26,7 +26,6 @@ The following are pending tasks that will hopefully be completed soon:
 - [ ] Tasks
 - [ ] Hooks
 - [ ] Proper dependency management
-- [ ] `neo info` command
 
 # Building Neo
 Neo can be built using Neo itself, or via Nimble. To build it via itself, run:
