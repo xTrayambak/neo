@@ -1,22 +1,21 @@
 name: neo
 backend: C
-license: BSD-3-Clause
+license: "BSD-3-Clause"
 kind: Binary
 binaries: [neo]
 toolchain:
   version: 2.2.4
-
+  cachedNimPath: !!null ~
 dependencies:
-  - "curly"
-  - "noise"
-  - "yaml"
-  - "semver"
-  - "jsony"
-  - "shakar"
-  - "results"
-  - "floof"
-  - "pretty"
-  - "leveldb"
+  - curly
+  - noise
+  - yaml
+  - semver
+  - jsony
+  - shakar
+  - results
+  - floof
+  - pretty
+  - leveldb
   - "https://github.com/ferus-web/sanchar"
-
 formatter: nph

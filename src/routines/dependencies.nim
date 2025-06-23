@@ -20,6 +20,7 @@ type
 
   CloneFailed* = object of SolverError
   CannotInferPackageName* = object of SolverError
+  PackageAlreadyDependency* = object of SolverError
 
   SolverCache = object
     lists*: seq[PackageList]
@@ -271,3 +272,33 @@ proc solveDependencies*(project: var Project): seq[Dependency] =
     dependencyVec &= dep
 
   move(dependencyVec)
+
+proc addDependency*(project: var Project, package: string) =
+  var url =
+    try:
+      some(url.parse(package))
+    except URLParseError:
+      none(URL)
+
+  # FIXME: Ugly, bad, no good hack.
+  var validUrl = true
+  url.applyThis:
+    validUrl = this.hostname.len > 0
+
+  if project.dependencies.contains(package):
+    raise newException(
+      PackageAlreadyDependency,
+      "The package `<red>" & package & "<reset>` is already a dependency to `<blue>" &
+        project.name & "<reset>`!",
+    )
+
+  if validUrl:
+    project.dependencies &= package
+  else:
+    var cache: SolverCache
+    cache.lists &= &lazilyFetchPackageList(DefaultPackageList)
+
+    if !cache.find(package):
+      packageNotFound(package)
+
+    project.dependencies &= package

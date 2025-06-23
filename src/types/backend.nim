@@ -8,22 +8,27 @@ type Backend* {.pure.} = enum
 
 func toBackend*(value: string): Backend =
   case toLowerAscii(value)
-  of "c": Backend.C
-  of "cpp": Backend.Cpp
-  of "js": Backend.JavaScript
-  of "objc": Backend.ObjectiveC
-  else: raise newException(ValueError, "Invalid backend string: `" & value & '`')
+  of "c":
+    Backend.C
+  of "cpp":
+    Backend.Cpp
+  of "js":
+    Backend.JavaScript
+  of "objc":
+    Backend.ObjectiveC
+  else:
+    raise newException(ValueError, "Invalid backend string: `" & value & '`')
 
 func `$`*(backend: Backend): string =
   case backend
   of Backend.C:
-    return "c"
+    return "C"
   of Backend.Cpp:
-    return "cpp"
+    return "Cpp"
   of Backend.JavaScript:
-    return "js"
+    return "JavaScript"
   of Backend.ObjectiveC:
-    return "objc"
+    return "ObjectiveC"
 
 func toHumanString*(backend: Backend): string =
   case backend

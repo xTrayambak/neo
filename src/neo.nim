@@ -391,7 +391,8 @@ proc showInfoLegacyCommand(path: string, package: PackageListItem) =
     echo colorTagSubs(
       "<green>backend:<reset> " & fileInfo.backend.toBackend().toHumanString()
     )
-  except ValueError: discard
+  except ValueError:
+    discard
   echo colorTagSubs("<green>documentation:<reset> " & package.web)
 
 proc showInfoCommand(args: Input) =
@@ -441,7 +442,8 @@ proc showInfoCommand(args: Input) =
       echo colorTagSubs("<green>backend:<reset> " & project.backend.toHumanString())
       echo colorTagSubs("<green>documentation:<reset> " & pkg.web)
     except:
-      error "Failed to load project manifest for `<red>" & args.arguments[0] & "`<reset>."
+      error "Failed to load project manifest for `<red>" & args.arguments[0] &
+        "`<reset>."
       error "Perhaps it depends on a Nimble file instead of a Neo file?"
       quit(QuitFailure)
   of 0:
@@ -467,6 +469,40 @@ proc showInfoCommand(args: Input) =
         echo colorTagSubs("  * <blue>" & bin & "<reset>")
   else:
     unreachable
+
+proc addPackageCommand(args: Input) =
+  if args.arguments.len < 1:
+    error "`<red>neo add<reset>` expects atleast one argument, got none instead."
+    quit(QuitFailure)
+
+  let path = getCurrentDir() / "neo.yml"
+  if not fileExists(path):
+    error "No `<blue>neo.yml<reset>` file was found"
+
+  var project = loadProject(path)
+
+  var failed = false
+  for package in args.arguments:
+    displayMessage("<green>Adding<reset>", package & " to dependencies")
+
+    try:
+      addDependency(project, package)
+      displayMessage("<green>Added<reset>", package & " to dependencies")
+    except PackageNotFound as err:
+      error "the package `<red>" & err.package &
+        "<reset>` was not found in any package indices."
+      failed = true
+      break
+    except PackageAlreadyDependency as err:
+      displayMessage("<yellow>warning<reset>", err.msg)
+
+  var code = QuitSuccess
+  if failed:
+    code = QuitFailure
+  else:
+    project.save(path)
+
+  quit(move(code))
 
 proc showHelpCommand() {.noReturn, sideEffect.} =
   echo "Neo is a package manager for Nim"
@@ -514,6 +550,8 @@ proc main() {.inline.} =
     formatProjectCommand(args)
   of "info":
     showInfoCommand(args)
+  of "add":
+    addPackageCommand(args)
   else:
     if args.command.len < 1:
       showHelpCommand()

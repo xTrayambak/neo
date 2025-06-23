@@ -59,9 +59,7 @@ proc greetInHindi*(name: string) =
     assert off, "I hate you and everything you stand for"
       # TODO: implement this, I'm too lazy
 
-  var stream = newFileStream(project.name / "neo.yml", fmWrite)
-  Dumper().dump(project, stream)
-  stream.close()
+  project.save(project.name / "neo.yml")
 
   if not gitInit(project.name):
     displayMessage(

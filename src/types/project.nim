@@ -38,6 +38,11 @@ func newProject*(
 ): Project {.inline.} =
   Project(name: name, license: license, kind: kind, toolchain: toolchain)
 
+proc save*(project: Project, path: string) =
+  var stream = newFileStream(path, fmWrite)
+  Dumper().dump(project, stream)
+  stream.close()
+
 proc loadProject*(file: string): Project {.inline, sideEffect.} =
   var stream = newFileStream(file, fmRead)
   stream.load(result)
