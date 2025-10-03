@@ -3,7 +3,7 @@
 ## but once we introduce version constraints, we'll need a smarter solver,
 ## similar to how Nimble has a SAT solver.
 import std/[os, options, strutils, tables, tempfiles]
-import pkg/shakar, pkg/sanchar/parse/url
+import pkg/[url, shakar]
 import ../types/[project, package_lists]
 import
   ../routines/[package_lists, git, neo_directory, state],
@@ -173,17 +173,12 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
 
   var url =
     try:
-      some(url.parse(dep.name))
-    except URLParseError:
+      some(parseUrl(dep.name))
+    except URLParsingError:
       none(URL)
 
-  # FIXME: Ugly, bad, no good hack.
-  var validUrl = true
-  url.applyThis:
-    validUrl = this.hostname.len > 0
-
   var finalDest: Option[string]
-  if !url or not validUrl:
+  if !url:
     let package = cache.find(dep.name)
 
     if !package:
@@ -274,16 +269,13 @@ proc solveDependencies*(project: var Project): seq[Dependency] =
   move(dependencyVec)
 
 proc addDependency*(project: var Project, package: string) =
-  var url =
+  let url =
     try:
-      some(url.parse(package))
-    except URLParseError:
+      some(parseUrl(package))
+    except URLParsingError:
       none(URL)
 
   # FIXME: Ugly, bad, no good hack.
-  var validUrl = true
-  url.applyThis:
-    validUrl = this.hostname.len > 0
 
   if project.dependencies.contains(package):
     raise newException(
@@ -292,7 +284,7 @@ proc addDependency*(project: var Project, package: string) =
         project.name & "<reset>`!",
     )
 
-  if validUrl:
+  if *url:
     project.dependencies &= package
   else:
     var cache: SolverCache

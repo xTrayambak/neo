@@ -1,7 +1,7 @@
 ## Everything to do with git.
 ## This module's routines act as wrappers over the Git CLI.
 import std/[os, osproc]
-import pkg/sanchar/parse/url
+import pkg/url
 
 type
   GitError* = object of OSError

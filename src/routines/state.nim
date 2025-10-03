@@ -1,7 +1,7 @@
 ## Everything to do with Neo's internal state.
 ## This is stored in Neo's private directory as a LevelDB database.
 import std/[os, strutils, tables]
-import pkg/[leveldb, shakar, jsony], pkg/sanchar/parse/url
+import pkg/[leveldb, shakar, jsony, url]
 import ./[neo_directory]
 
 type State* = LevelDb
