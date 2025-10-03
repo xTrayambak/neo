@@ -415,7 +415,11 @@ proc showInfoCommand(args: Input) =
       quit(QuitFailure)
 
     let pkg = &package
-    discard downloadPackage(pkg, PackageRef(name: args.arguments[0]))
+    try:
+      discard downloadPackage(pkg, PackageRef(name: args.arguments[0]))
+    except CloneFailed as err:
+      error err.msg
+      quit(QuitFailure)
 
     try:
       let

@@ -124,12 +124,13 @@ proc downloadPackageFromURL*(
 
   case meth
   of "git":
-    if not gitClone(url, dest):
+    let cloned = gitClone(url, dest)
+    if !cloned:
       raise newException(
         CloneFailed,
         "Failed to clone repository for dependency <blue>" & (
           if *name: &name else: $url
-        ) & "<reset>!",
+        ) & "<reset>:\n<red>" & cloned.error() & "<reset>",
       )
 
     if deferred:
