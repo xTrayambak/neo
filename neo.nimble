@@ -21,4 +21,3 @@ requires "leveldb >= 0.4.1"
 requires "pretty >= 0.2.0"
 requires "compiler >= 2.2.4"
 requires "url >= 0.1.0"
-

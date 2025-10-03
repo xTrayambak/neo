@@ -498,6 +498,13 @@ proc addPackageCommand(args: Input) =
       break
     except PackageAlreadyDependency as err:
       displayMessage("<yellow>warning<reset>", err.msg)
+    except InvalidForgeAlias as err:
+      error "the forge alias `<red>" & err.url &
+        "<reset>` could not be resolved into any meaningful forge."
+      failed = true
+      break
+    except SolverError as err:
+      error "neo encountered a generic solver invariant: <red>" & err.msg & "<reset>"
 
   var code = QuitSuccess
   if failed:
