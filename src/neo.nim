@@ -42,7 +42,7 @@ proc initializePackageCommand(args: Input) {.noReturn.} =
 
   quit(QuitSuccess)
 
-proc buildPackageCommand(args: Input) {.noReturn.} =
+proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
   var directory = "src"
   let sourceFile =
     if args.arguments.len > 0:
@@ -66,6 +66,9 @@ proc buildPackageCommand(args: Input) {.noReturn.} =
   var extraFlags: string
   for flag, value in args.flags:
     extraFlags &= "--" & flag & ':' & value
+
+  if not hasColorSupport:
+    extraFlags &= "--colors:off "
 
   for switch in args.switches:
     extraFlags &= "--" & switch
@@ -535,7 +538,7 @@ proc main() {.inline.} =
   of "init":
     initializePackageCommand(args)
   of "build":
-    buildPackageCommand(args)
+    buildPackageCommand(args, output.hasColorSupport)
   of "run":
     runPackageCommand(args)
   of "search":

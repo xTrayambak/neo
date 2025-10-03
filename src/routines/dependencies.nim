@@ -275,8 +275,6 @@ proc addDependency*(project: var Project, package: string) =
     except URLParsingError:
       none(URL)
 
-  # FIXME: Ugly, bad, no good hack.
-
   if project.dependencies.contains(package):
     raise newException(
       PackageAlreadyDependency,
