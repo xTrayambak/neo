@@ -403,11 +403,14 @@ proc solveDependencies*(
   # the base Nimble package index but
   # we'll eventually add a config option
   # to add other lists.
+  var refs = project.getDependencies()
+  if refs.len < 1:
+    return
+
   var cache: SolverCache
   cache.lists &= &lazilyFetchPackageList(DefaultPackageList)
 
   var dependencyVec: seq[Dependency]
-  var refs = project.getDependencies()
   var newRefs: seq[PackageRef]
 
   # Just let the user know that resolution is occurring, in the event that it becomes
