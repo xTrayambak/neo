@@ -48,7 +48,7 @@ type
     backend*: Backend
     license*: string
     kind*: ProjectKind
-    binaries*: seq[string]
+    binaries* {.defaultVal: @[].}: seq[string]
     toolchain*: Toolchain
     dependencies*: seq[string]
 
