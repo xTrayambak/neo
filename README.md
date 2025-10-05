@@ -67,3 +67,33 @@ $ neo init myproject
 $ neo build --arguments --here --are --passed --to --nim
 Building myproject with the C backend
 ```
+
+## Searching for packages
+```command
+$ neo search url
+
+ url  A high-performance URL parser based on the WHATWG standard.
+ urlly  URL and URI parsing for C and JS backend.
+ urlon  URL Object Notation implemented in Nim
+ gurl  A little lib for generating URL with args.
+ curly  Makes using libcurl efficiently easy
+ unroll  unroll for-loops (and map into seq/array) at compile-time in nim
+ curlies  A macro for object construction using {} (curlies).
+ libcurl  Nim wrapper for libcurl.
+ openurl  Open Any Url/File in the default App / WebBrowser.
+ unrolled  Unroll for-loops at compile-time.
+ urlshortener  A URL shortener cli app. using bit.ly
+ dataUrl  Easily create data urls! CLI included
+ shorturl  Nim module for generating URL identifiers for Tiny URL and bit.ly-like URLs
+ osureplay  osu! replay parser
+ surrealdb  SurrealDB driver for Nim
+
+ ...  and 7 packages more (use --limit:<N> to see more)
+```
+
+## Fetching information for a package
+This causes the package to be downloaded, so that its
+additional metadata can be explored.
+
+```command
+

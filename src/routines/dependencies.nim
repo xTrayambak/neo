@@ -59,6 +59,16 @@ proc getDirectoryForPackage*(name: string, version: string): string =
 
   dir
 
+proc findDirectoryForPackage*(name: string): Option[string] =
+  for kind, dir in walkDir(getNeoDir() / "packages"):
+    if kind != pcDir:
+      continue
+
+    if not dir.contains(name & '-'):
+      continue
+
+    return some(dir)
+
 proc isDepInstalled*(dep: PackageRef): bool =
   dirExists(getDirectoryForPackage(dep.name, $dep.version))
 

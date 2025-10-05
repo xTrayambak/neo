@@ -88,6 +88,7 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
     error exc.msg
     quit(QuitFailure)
 
+  var failure = false
   for binFile in project.binaries:
     displayMessage(
       "<yellow>compiling<reset>",
@@ -115,8 +116,12 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
         "<red>" & binFile & "<reset>",
         "has failed to compile. Check the error above for more information.",
       )
+      failure = true
       break
         # TODO: add a flag called `--ignore-build-failure` which doesn't cause the entire build process to stop after an error
+
+  if failure:
+    quit(QuitFailure)
 
 proc runPackageCommand(args: Input) =
   var
@@ -198,6 +203,7 @@ proc runPackageCommand(args: Input) =
       "<red>" & binaryName & "<reset>",
       "has failed to compile. Check the error above for more information.",
     )
+    quit(QuitFailure)
 
 proc searchPackageCommand(args: Input) =
   if args.arguments.len < 1:
@@ -395,6 +401,7 @@ proc formatProjectCommand(args: Input) =
     quit(QuitFailure)
 
 proc showInfoLegacyCommand(path: string, package: PackageListItem) =
+  ## Show the information of a legacy (Nimble-only) package.
   let nimbleFilePath = findNimbleFile(path)
   if !nimbleFilePath:
     error "This package does not seem to have a `<blue>neo.yml<reset>` or a `<blue>.nimble<reset>` file."
@@ -445,7 +452,7 @@ proc showInfoCommand(args: Input) =
 
     try:
       let
-        base = getDirectoryForPackage(args.arguments[0], newString(0))
+        base = &findDirectoryForPackage(args.arguments[0])
         path = base / "neo.yml"
       if not fileExists(path):
         showInfoLegacyCommand(base, pkg)
@@ -454,11 +461,8 @@ proc showInfoCommand(args: Input) =
           "This project only has a `<blue>.nimble<reset>` file. If you own it, consider adding a `<green>neo.yml<reset>` to it as well.",
         )
         return
-        #[ error "The package `<red>" & args.arguments[0] &
-          "<reset>` does not have a Neo manifest."
-        error "It was likely made with Nimble in mind. As such, Neo cannot inspect it any further."
-        quit(QuitFailure) ]#
 
+      # Load the Neo manifest.
       let project = loadProject(path)
       var tags: seq[string]
 
@@ -549,17 +553,17 @@ proc showHelpCommand() {.noReturn, sideEffect.} =
   echo """
 
 Commands:
-init   [name]                   Initialize a project.
-build                           Build the project in the current directory, if no path is specified.
-run                             Build and run the project in the current directory, if no path is specified.
-search [name]                   Search the package index for a particular package.
-help                            Show this message.
-install                         Install binaries from the current project.
-sync                            Synchronize the package index.
-info   [name]                   Get more details about a particular package.
+  init   [name]                   Initialize a project.
+  build                           Build the project in the current directory, if no path is specified.
+  run                             Build and run the project in the current directory, if no path is specified.
+  search [name]                   Search the package index for a particular package.
+  help                            Show this message.
+  install                         Install binaries from the current project.
+  sync                            Synchronize the package index.
+  info   [name]                   Get more details about a particular package.
 
 Options:
---colorless, C                  Do not use ANSI-escape codes to color Neo's output. This makes Neo's output easier to parse.
+  --colorless, C                  Do not use ANSI-escape codes to color Neo's output. This makes Neo's output easier to parse.
   """
 
 proc main() {.inline.} =
