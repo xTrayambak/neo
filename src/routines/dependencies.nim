@@ -3,7 +3,7 @@
 ## but once we introduce version constraints, we'll need a smarter solver,
 ## similar to how Nimble has a SAT solver.
 import std/[os, options, strutils, tables, tempfiles]
-import pkg/[url, results, shakar]
+import pkg/[url, results, shakar, semver, pretty]
 import ../types/[project, package_lists]
 import
   ../routines/[package_lists, git, neo_directory, state],
@@ -29,7 +29,10 @@ type
 
   Dependency* = ref object
     project*: Project
+    pkgRef*: PackageRef
     deps*: seq[Dependency]
+
+  SolvedGraph* = seq[PackageRef]
 
 func packageNotFound*(name: string) {.raises: [PackageNotFound].} =
   var exc = newException(PackageNotFound, "")
@@ -49,15 +52,17 @@ proc find(cache: SolverCache, package: string): Option[PackageListItem] {.inline
       if pkg.name == package:
         return some(pkg)
 
-proc getDirectoryForPackage*(name: string): string =
-  let dir = getNeoDir() / "packages" / name
+proc getDirectoryForPackage*(name: string, version: string): string =
+  let
+    version = if version.len < 1: "any" else: version
+    dir = getNeoDir() / "packages" / name & '-' & version
 
   dir
 
 proc isDepInstalled*(dep: PackageRef): bool =
-  dirExists(getDirectoryForPackage(dep.name))
+  dirExists(getDirectoryForPackage(dep.name, $dep.version))
 
-proc getDepPaths*(deps: seq[Dependency]): seq[string] =
+proc getDepPaths*(deps: seq[Dependency], graph: SolvedGraph): seq[string] =
   var paths: seq[string]
 
   for dep in deps:
@@ -65,13 +70,22 @@ proc getDepPaths*(deps: seq[Dependency]): seq[string] =
       # FIXME: This shouldn't happen. Ever.
       continue
 
-    let base = getDirectoryForPackage(dep.project.name)
+    let pkgRefOpt = graph.find(dep.project.name)
+    assert(
+      *pkgRefOpt,
+      "BUG: Dependency `" & dep.project.name &
+        "` has no linked package reference in the solved graph!",
+    )
+
+    let (pkgRef, _) = &pkgRefOpt
+
+    let base = getDirectoryForPackage(dep.project.name, $pkgRef.version)
     paths &= base
 
     if dirExists(base / "src"):
       paths &= base / "src"
 
-    paths &= getDepPaths(dep.deps)
+    paths &= getDepPaths(dep.deps, graph)
 
   move(paths)
 
@@ -115,36 +129,64 @@ proc downloadPackageFromURL*(
     url: string | URL,
     dest: Option[string] = none(string),
     meth: string = "git",
-    name: Option[string] = none(string),
+    pkg: PackageRef,
 ): string =
   # If this is a URL, we need a temporary place to store the files until we can infer the project's name.
   let (dest, deferred) = evaluateProjectDirectory(dest)
   var extraName: Option[string]
   var finalDest: string = dest
 
+  let
+    name = pkg.name
+    version = pkg.version
+    prettyVersion =
+      if pkg.constraint == VerConstraint.None:
+        "any"
+      else:
+        $version
+
   case meth
   of "git":
     let cloned = gitClone(url, dest)
+
+    if pkg.constraint != VerConstraint.None:
+      let checkout = gitCheckout(dest, $version)
+      if !checkout:
+        # Here, we need to handle a quirk.
+        # Some packages made by certain specimen
+        # like to tag their versions as 'v<version>'
+        # 
+        # Examples include araq/libcurl. Why do they do this?
+        # I have no clue. We might as well account for their quirky behaviour.
+        let quirkyCheckout = gitCheckout(dest, 'v' & $version)
+
+        if !quirkyCheckout:
+          # If even that fails, we'll need to use the base version.
+          # There's nothing we can do :(
+          displayMessage(
+            "<yellow>warning<reset>",
+            "Using base version; cannot checkout to " & name & '@' & $version,
+          )
+
     if !cloned:
       raise newException(
         CloneFailed,
-        "Failed to clone repository for dependency <blue>" & (
-          if *name: &name else: $url
-        ) & "<reset>:\n<red>" & cloned.error() & "<reset>",
+        "Failed to clone repository for dependency <blue>" & (name) & "<reset>:\n<red>" &
+          cloned.error() & "<reset>",
       )
 
     if deferred:
       let name = inferDestPackageName(dest)
       extraName = some(name)
 
-      finalDest = getDirectoryForPackage(name)
+      finalDest = getDirectoryForPackage(name, $pkg.version)
       moveDir(dest, finalDest)
 
       addPackageUrlName(url, name)
 
     displayMessage(
       "<green>Downloaded<reset>",
-      (if *name: &name else: $url) & (
+      (name & '@' & "<green>" & prettyVersion & "<reset>") & (
         if *extraName:
           " (<blue>" & &extraName & "<reset>)"
         else:
@@ -160,12 +202,12 @@ proc downloadPackage*(
 ): string =
   let
     meth = entry.`method`
-    dest = getDirectoryForPackage(pkg.name)
+    dest = getDirectoryForPackage(pkg.name, $pkg.version)
 
   if dirExists(dest) and not ignoreCache:
     return
 
-  downloadPackageFromURL(entry.url, some(dest), meth, some(pkg.name))
+  downloadPackageFromURL(entry.url, some(dest), meth, pkg)
 
 proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Dependency =
   # Firstly, try to find the dep in our solver cache.
@@ -193,7 +235,7 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
     if not isDepInstalled(dep):
       finalDest = some(downloadPackage(pkg, dep))
     else:
-      finalDest = some(getDirectoryForPackage(dep.name))
+      finalDest = some(getDirectoryForPackage(dep.name, $dep.version))
   else:
     # We don't know the package's name, so we need to defer
     # its resolution if it isn't in our known lists either.
@@ -205,10 +247,10 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
       urlString = $(&url)
 
     if urlString in list:
-      finalDest = some(getDirectoryForPackage(list[urlString]))
+      finalDest = some(getDirectoryForPackage(list[urlString], $dep.version))
 
-    if !finalDest or not dirExists(&finalDest):
-      finalDest = some(downloadPackageFromURL(&url))
+    # if !finalDest or not dirExists(&finalDest):
+    #  finalDest = some(downloadPackageFromURL(&url, $dep.version))
 
   # Now, we'll load up a Neo project if it exists for that project.
   # TODO: Load .nimble files as projects too, atleast for now.
@@ -230,7 +272,7 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
 
   if neoFileExists:
     var project = loadProject(neoFilePath)
-    var dependency = Dependency()
+    var dependency = Dependency(pkgRef: dep)
     for childDep in dependency.project.getDependencies():
       dependency.deps &= handleDep(cache, project, childDep)
 
@@ -242,17 +284,110 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
     # we can atleast infer all the packages we require.
     # FIXME: This can probably be made a little less miserable.
     var info = extractRequiresInfo(&nimbleFilePath)
-    var dependency = Dependency()
+    var dependency = Dependency(pkgRef: dep)
     var project = Project(name: dep.name)
     for req in info.requires:
-      dependency.deps &= handleDep(cache, project, PackageRef(name: req.split(' ')[0]))
+      let pref = block:
+        let parsed = parsePackageRefExpr(req)
+        if parsed.isErr:
+          PackageRef(name: req.split(' ')[0])
+        else:
+          parsed.get()
+
+      dependency.deps &= handleDep(cache, project, pref)
 
     dependency.project = project
     return move(dependency)
   else:
     unreachable
 
-proc solveDependencies*(project: var Project): seq[Dependency] =
+proc solveDependencies(list: var seq[PackageRef]) =
+  var solved = newSeqOfCap[PackageRef](list.len - 1)
+
+  for dep in list:
+    let found = solved.find(dep.name)
+    if !found:
+      # There's no competing ref.
+      solved &= dep
+    else:
+      let (disputed, index) = &found
+      # Let `disputed` be X and `dep` be Y
+      # Let X's constraint be Xc and Y's constraint be Yc.
+      # There's a conflict and we need to choose either of X or Y.
+
+      template chooseX() =
+        # Continue on.
+        continue
+
+      template chooseY() =
+        # Place Y at the index X exists at.
+        solved[index] = dep
+
+      # Case 0.0: if Xc == None and Xy != None:
+      if disputed.constraint == VerConstraint.None and
+          dep.constraint != VerConstraint.None:
+        # Choose Y.
+        chooseY()
+
+      # Case 0.1: Vice-versa of 0.0
+      if dep.constraint == VerConstraint.None and
+          disputed.constraint != VerConstraint.None:
+        # Choose X.
+        chooseX()
+
+      # Case 1: X.ver > Y.ver && Yc == GreaterThan && Xc == GreaterThan
+      if disputed.version > dep.version and dep.constraint == VerConstraint.GreaterThan and
+          disputed.constraint == VerConstraint.GreaterThan:
+        # Choose X.
+        chooseX()
+
+      # Case 1.1: Y.ver > X.ver && Xc == GreaterThan && Yc == GreaterThan
+      if dep.version > disputed.version and
+          disputed.constraint == VerConstraint.GreaterThan:
+        # Choose Y.
+        chooseY()
+
+      # Case 2: Xc == Equal and Yc == Equal
+      if disputed.constraint == VerConstraint.Equal and
+          dep.constraint == VerConstraint.Equal:
+        # If X.ver != Y.ver, we have reached an unsolvable state.
+        # Report an error and abort resolution immediately.
+        if disputed.version != dep.version:
+          var exc = newException(ConflictingExactVersions, "")
+          exc.pkgName = disputed.name
+          exc.a = disputed.version
+          exc.b = dep.version
+
+          raise move(exc)
+        else:
+          # Otherwise, choose X as they are already equal.
+          chooseX()
+
+      template case21Impl(x, y: PackageRef) =
+        # Case 2.1: if Xc == Equal && Yc == GreaterThan || Yc == GreaterThanEqual
+        if x.constraint == VerConstraint.Equal and
+            dep.constraint in {
+              VerConstraint.GreaterThan, VerConstraint.GreaterThanEqual
+            }:
+          # Case 2.1.1: If X < Y, we have reached an unsolvable state
+          if x.version < y.version:
+            unsolvableConstraint(
+              disputed.name, x.version, y.version, x.constraint, y.constraint
+            )
+
+        # Case 2.1.2: If X > Y, we can choose X.
+        chooseX()
+
+      case21Impl(disputed, dep)
+      case21Impl(dep, disputed)
+
+      unreachable
+
+  list = ensureMove(solved)
+
+proc solveDependencies*(
+    project: var Project
+): tuple[deps: seq[Dependency], graph: SolvedGraph] =
   # Prime-up the cache.
   # For now, we'll only include
   # the base Nimble package index but
@@ -262,14 +397,33 @@ proc solveDependencies*(project: var Project): seq[Dependency] =
   cache.lists &= &lazilyFetchPackageList(DefaultPackageList)
 
   var dependencyVec: seq[Dependency]
-  for dep in project.getDependencies():
+  var refs = project.getDependencies()
+  var newRefs: seq[PackageRef]
+
+  # Just let the user know that resolution is occurring, in the event that it becomes
+  # unbearably slow.
+  displayMessage("<green>Resolving<reset>", "dependencies")
+
+  solveDependencies(refs)
+
+  # Now, with the fixed versions, we can go ahead and
+  # download all our dependencies
+  for dep in refs:
     let dep = handleDep(cache, project, dep)
     if dep == nil:
       continue
 
+    for child in dep.deps:
+      if child == nil:
+        continue # FIXME: Please fix this!!!
+      newRefs &= child.pkgRef
+
     dependencyVec &= dep
 
-  move(dependencyVec)
+  refs &= newRefs
+  solveDependencies(refs)
+
+  (deps: move(dependencyVec), graph: move(refs))
 
 proc addDependencyForgeAlias*(project: var Project, url: URL) =
   ## This routine checks if an opaque URL is a valid forge alias.

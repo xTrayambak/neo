@@ -1,4 +1,6 @@
 # neo
+![An image of Neo compiling itself](assets/neo-compile.jpg)
+
 Neo is a new package manager for the [Nim programming language](https://nim-lang.org). It aims to:
 - Have a clean, maintainable codebase
 - Be simple to use
@@ -24,6 +26,7 @@ Neo is currently a ~1.4K LoC project, and has the following features ready and w
 
 The following are pending tasks that will hopefully be completed soon:
 - [ ] Proper dependency solver
+- [ ] Forge aliases
 - [ ] Tasks
 - [ ] Hooks
 - [ ] Proper dependency management

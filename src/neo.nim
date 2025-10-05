@@ -1,4 +1,6 @@
 ## Neo - the new package manager for Nim
+## 
+## Copyright (C) Trayambak Rai (xtrayambak at disroot dot org)
 import std/[os, osproc, tables, sequtils, strutils, times]
 import pkg/[semver, shakar, floof, pretty]
 import ./[argparser, output]
@@ -73,12 +75,18 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
   for switch in args.switches:
     extraFlags &= "--" & switch
 
-  var deps: seq[Dependency]
+  var
+    deps: seq[Dependency]
+    graph: SolvedGraph
+
   try:
-    deps = project.solveDependencies()
-  except CatchableError as exc:
-    error "Failed to solve dependencies: " & exc.msg
-    quit(1)
+    (deps, graph) = project.solveDependencies()
+  except CannotResolveDependencies as exc:
+    error exc.msg
+    quit(QuitFailure)
+  except CloneFailed as exc:
+    error exc.msg
+    quit(QuitFailure)
 
   for binFile in project.binaries:
     displayMessage(
@@ -90,7 +98,9 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
       project.backend,
       directory / binFile & ".nim",
       CompilationOptions(
-        outputFile: binFile, extraFlags: extraFlags, appendPaths: getDepPaths(deps)
+        outputFile: binFile,
+        extraFlags: extraFlags,
+        appendPaths: getDepPaths(deps, graph),
       ),
     )
 
@@ -143,12 +153,18 @@ proc runPackageCommand(args: Input) =
 
   var toolchain = newToolchain(project.toolchain.version)
 
-  var deps: seq[Dependency]
+  var
+    deps: seq[Dependency]
+    graph: SolvedGraph
+
   try:
-    deps = project.solveDependencies()
-  except CatchableError as exc:
-    error "Failed to solve dependencies: " & exc.msg
-    quit(1)
+    (deps, graph) = project.solveDependencies()
+  except CannotResolveDependencies as exc:
+    error exc.msg
+    quit(QuitFailure)
+  except CloneFailed as exc:
+    error exc.msg
+    quit(QuitFailure)
 
   displayMessage(
     "<yellow>compiling<reset>",
@@ -159,7 +175,7 @@ proc runPackageCommand(args: Input) =
   let stats = toolchain.compile(
     project.backend,
     directory / binaryName & ".nim",
-    CompilationOptions(outputFile: binaryName, appendPaths: getDepPaths(deps)),
+    CompilationOptions(outputFile: binaryName, appendPaths: getDepPaths(deps, graph)),
   )
   if stats.successful:
     displayMessage(
@@ -260,12 +276,18 @@ proc installPackageCommand(args: Input) =
 
   var toolchain = newToolchain(project.toolchain.version)
 
-  var deps: seq[Dependency]
+  var
+    deps: seq[Dependency]
+    graph: SolvedGraph
+
   try:
-    deps = project.solveDependencies()
-  except CatchableError as exc:
-    error "Failed to solve dependencies: " & exc.msg
-    quit(1)
+    (deps, graph) = project.solveDependencies()
+  except CannotResolveDependencies as exc:
+    error exc.msg
+    quit(QuitFailure)
+  except CloneFailed as exc:
+    error exc.msg
+    quit(QuitFailure)
 
   var fail = false
   for binaryName in project.binaries:
@@ -281,7 +303,7 @@ proc installPackageCommand(args: Input) =
       CompilationOptions(
         outputFile: getNeoDir() / "bin" / binaryName,
         extraFlags: "--define:release --define:speed",
-        appendPaths: getDepPaths(deps),
+        appendPaths: getDepPaths(deps, graph),
       ),
     )
     if stats.successful:
@@ -423,7 +445,7 @@ proc showInfoCommand(args: Input) =
 
     try:
       let
-        base = getDirectoryForPackage(args.arguments[0])
+        base = getDirectoryForPackage(args.arguments[0], newString(0))
         path = base / "neo.yml"
       if not fileExists(path):
         showInfoLegacyCommand(base, pkg)

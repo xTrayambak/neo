@@ -15,14 +15,30 @@ proc getGitPath*(): string =
 
   path
 
-proc gitClone*(url: string | URL, dest: string, depth: uint = 1): Result[void, string] =
+proc gitClone*(
+    url: string | URL, dest: string, depth: uint = 1, branch: string = ""
+): Result[void, string] =
   let git = getGitPath()
   if dirExists(dest):
     removeDir(dest)
 
   let
-    payload = git & " clone " & $url & ' ' & dest & " --depth=" & $depth
+    payload =
+      git & " clone " & $url & ' ' & dest & (
+        if branch.len > 0:
+          " --branch " & branch.quoteShell
+        else: newString(0)
+      )
     (output, code) = execCmdEx(payload)
+
+  if code == 0:
+    return ok()
+
+  err(output)
+
+proc gitCheckout*(dest: string, branch: string = "master"): Result[void, string] =
+  let git = getGitPath()
+  let (output, code) = execCmdEx(git & " -C " & dest & " checkout " & branch.quoteShell)
 
   if code == 0:
     return ok()
