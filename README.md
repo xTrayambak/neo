@@ -96,4 +96,12 @@ This causes the package to be downloaded, so that its
 additional metadata can be explored.
 
 ```command
-
+$ neo info jester
+ Downloaded  jester@any
+jester #web #http #framework #dsl
+A sinatra-like web framework for Nim.
+version: 0.6.0
+license: MIT
+documentation: https://github.com/dom96/jester
+ notice  This project only has a `.nimble` file. If you own it, consider adding a `neo.yml` to it as well.
+```
