@@ -252,15 +252,15 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
     #
     # This way, we don't need to redownload URL-based packages
     # again and again.
-    let
-      list = getPackageUrlNames()
-      urlString = $(&url)
+    let list = getPackageUrlNames()
+
+    let urlString = $(&url)
 
     if urlString in list:
       finalDest = some(getDirectoryForPackage(list[urlString], $dep.version))
 
-    # if !finalDest or not dirExists(&finalDest):
-    #  finalDest = some(downloadPackageFromURL(&url, $dep.version))
+    if !finalDest or not dirExists(&finalDest):
+      finalDest = some(downloadPackageFromURL(&url, dest = none(string), pkg = dep))
 
   # Now, we'll load up a Neo project if it exists for that project.
   # TODO: Load .nimble files as projects too, atleast for now.
