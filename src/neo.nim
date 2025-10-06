@@ -77,6 +77,8 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
 
   if not hasColorSupport:
     extraFlags &= "--colors:off "
+  else:
+    extraFlags &= "--colors:on "
 
   for switch in args.switches:
     extraFlags &= "--" & switch
