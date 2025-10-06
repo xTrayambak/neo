@@ -48,11 +48,25 @@ type
     backend*: Backend
     license*: string
     kind*: ProjectKind
+    version: string
     binaries* {.defaultVal: @[].}: seq[string]
     toolchain*: Toolchain
     dependencies*: seq[string]
 
     formatter* {.defaultVal: "nimpretty".}: string
+
+func version*(project: Project): Result[semver.Version, string] {.inline.} =
+  try:
+    return ok(parseVersion(project.version))
+  except semver.ParseError as exc:
+    return err(exc.msg)
+
+func `version=`*(project: var Project, input: string) {.inline, raises: [].} =
+  ## Set the version field of this project to the value
+  ## of `input`
+  ##
+  ## **NOTE**: This routine performs no validation upon the provided input.
+  project.version = input
 
 func `==`*(a, b: PackageRef): bool {.inline.} =
   a.name == b.name and a.version == b.version and a.constraint == b.constraint
