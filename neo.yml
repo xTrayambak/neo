@@ -8,15 +8,15 @@ toolchain:
   version: 2.2.4
   cachedNimPath: !!null ~
 dependencies:
-  - curly
-  - noise
-  - yaml
-  - semver
-  - jsony
-  - shakar
-  - results
-  - floof
-  - pretty
-  - leveldb
-  - url
+  - curly >= 1.1.1
+  - noise >= 0.1.10
+  - yaml >= 2.2.0
+  - semver >= 1.2.3
+  - jsony >= 1.1.5
+  - shakar >= 0.1.3
+  - results >= 0.5.1
+  - floof >= 1.0.0
+  - pretty == 0.1.0
+  - leveldb >= 0.4.1
+  - url >= 0.1.0
 formatter: nph
