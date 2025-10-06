@@ -5,8 +5,7 @@ kind: Binary
 version: 0.1.0
 binaries: [neo]
 toolchain:
-  version: 2.2.4
-  cachedNimPath: !!null ~
+  version: 2.2.0
 dependencies:
   - curly >= 1.1.1
   - noise >= 0.1.10

@@ -7,15 +7,11 @@ type
 
   Toolchain* {.ignore: ["cachedNimPath"].} = object
     version*: string
-    cachedNimPath* {.defaultVal: none(string).}: Option[string]
 
 func getVersion*(toolchain: Toolchain): Version =
   toolchain.version.parseVersion()
 
-proc findNimExe*(toolchain: var Toolchain) {.sideEffect.} =
-  if *toolchain.cachedNimPath:
-    return
-
+proc findNimExe*(toolchain: var Toolchain): Option[string] {.sideEffect.} =
   # Try the Nim executable in the system path
   let nim = findExe("nim")
   if nim.len > 0:
@@ -36,9 +32,7 @@ proc findNimExe*(toolchain: var Toolchain) {.sideEffect.} =
       )
 
     if version >= toolchain.getVersion():
-      # We found a match.
-      toolchain.cachedNimPath = some(nim)
-      return
+      return some(nim)
 
   # TODO: implement a case for this
   assert off, "Unreachable/Not implemented"
@@ -53,11 +47,7 @@ proc invoke*(
     discardable,
     sideEffect
 .} =
-  if *toolchain.cachedNimPath:
-    return execCmd(&toolchain.cachedNimPath & ' ' & command) == 0
-
-  toolchain.findNimExe()
-  toolchain.invoke(command)
+  execCmd(&toolchain.findNimExe() & ' ' & command) == 0
 
 proc compile*(
     toolchain: var Toolchain,
@@ -65,9 +55,8 @@ proc compile*(
     file: string,
     options: CompilationOptions,
 ): CompilationStatistics =
-  toolchain.findNimExe()
-  let payload =
-    &toolchain.cachedNimPath & ' ' & ($backend & ' ' & $options & ' ' & file)
+  let nimPath = toolchain.findNimExe()
+  let payload = &nimPath & ' ' & ($backend & ' ' & $options & ' ' & file)
 
   let res = execCmdEx(payload)
   var output = res.output.splitLines()
