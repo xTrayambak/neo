@@ -6,7 +6,8 @@ import pkg/[semver, shakar, floof, results]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
 import
-  ./routines/[initialize, package_lists, state, dependencies, neo_directory],
+  ./routines/
+    [initialize, package_lists, forge_aliases, state, dependencies, neo_directory],
   ./routines/nimble/declarativeparser
 
 const
