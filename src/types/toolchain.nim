@@ -67,9 +67,7 @@ proc compile*(
 ): CompilationStatistics =
   toolchain.findNimExe()
   let payload =
-    &toolchain.cachedNimPath & " --colors:on " & (
-      $backend & ' ' & $options & ' ' & file
-    )
+    &toolchain.cachedNimPath & ' ' & ($backend & ' ' & $options & ' ' & file)
 
   let res = execCmdEx(payload)
   var output = res.output.splitLines()
