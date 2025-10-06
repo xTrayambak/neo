@@ -3,7 +3,7 @@
 ## but once we introduce version constraints, we'll need a smarter solver,
 ## similar to how Nimble has a SAT solver.
 import std/[os, options, strutils, tables, tempfiles]
-import pkg/[url, results, shakar, semver, pretty]
+import pkg/[url, results, shakar, semver]
 import ../types/[project, package_lists]
 import
   ../routines/[package_lists, git, neo_directory, state],

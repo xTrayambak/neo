@@ -31,6 +31,14 @@ proc gitClone*(
       )
     (output, code) = execCmdEx(payload)
 
+  # Go through each path in the destination and remove
+  # the executable (X) bit from every single file, if found.
+  # There is no sane excuse for any package to require executables,
+  # as they're only meant to provide Nim source files, and maybe
+  # some extra non-Nim files but NEVER executable code.
+  for path in walkDirRec(dest, yieldFilter = {pcFile}):
+    exclFilePermissions(path, {fpUserExec, fpGroupExec, fpOthersExec})
+
   if code == 0:
     return ok()
 
