@@ -26,9 +26,7 @@ proc findNimExe*(toolchain: var Toolchain): Option[string] {.sideEffect.} =
       # git hash: b47747d31844c6bd9af4322efe55e24fefea544c
       # active boot switches: -d:release
       version = parseVersion(
-        output.splitLines()[0].split("Nim Compiler Version ")[1].split(
-          " [Linux: amd64]"
-        )[0]
+        output.splitLines()[0].split("Nim Compiler Version ")[1].split(" [")[0]
       )
 
     if version >= toolchain.getVersion():
