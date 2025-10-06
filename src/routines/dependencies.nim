@@ -72,30 +72,16 @@ proc findDirectoryForPackage*(name: string): Option[string] =
 proc isDepInstalled*(dep: PackageRef): bool =
   dirExists(getDirectoryForPackage(dep.name, $dep.version))
 
-proc getDepPaths*(deps: seq[Dependency], graph: SolvedGraph): seq[string] =
+proc getDepPaths*(graph: SolvedGraph): seq[string] =
   var paths: seq[string]
 
-  for dep in deps:
-    if dep == nil:
-      # FIXME: This shouldn't happen. Ever.
-      continue
-
-    let pkgRefOpt = graph.find(dep.project.name)
-    assert(
-      *pkgRefOpt,
-      "BUG: Dependency `" & dep.project.name &
-        "` has no linked package reference in the solved graph!",
-    )
-
-    let (pkgRef, _) = &pkgRefOpt
-
-    let base = getDirectoryForPackage(dep.project.name, $pkgRef.version)
-    paths &= base
+  for pkgRef in graph:
+    let base = getDirectoryForPackage(pkgRef.name, $pkgRef.version)
 
     if dirExists(base / "src"):
       paths &= base / "src"
-
-    paths &= getDepPaths(dep.deps, graph)
+    else:
+      paths &= base
 
   move(paths)
 

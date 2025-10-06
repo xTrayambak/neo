@@ -5,7 +5,7 @@ import pkg/[yaml, semver, shakar]
 type
   NimInvokation* = object
 
-  Toolchain* {.ignore: ["cachedNimPath"].} = object
+  Toolchain* = object
     version*: string
 
 func getVersion*(toolchain: Toolchain): Version =

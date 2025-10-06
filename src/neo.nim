@@ -107,9 +107,7 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
       project.backend,
       directory / binFile & ".nim",
       CompilationOptions(
-        outputFile: binFile,
-        extraFlags: extraFlags,
-        appendPaths: getDepPaths(deps, graph),
+        outputFile: binFile, extraFlags: extraFlags, appendPaths: getDepPaths(graph)
       ),
     )
 
@@ -188,7 +186,7 @@ proc runPackageCommand(args: Input) =
   let stats = toolchain.compile(
     project.backend,
     directory / binaryName & ".nim",
-    CompilationOptions(outputFile: binaryName, appendPaths: getDepPaths(deps, graph)),
+    CompilationOptions(outputFile: binaryName, appendPaths: getDepPaths(graph)),
   )
   if stats.successful:
     displayMessage(
@@ -306,7 +304,7 @@ proc installBinaryProject(
       CompilationOptions(
         outputFile: getNeoDir() / "bin" / binaryName,
         extraFlags: "--define:release --define:speed",
-        appendPaths: getDepPaths(deps, graph),
+        appendPaths: getDepPaths(graph),
       ),
     )
     if stats.successful:
