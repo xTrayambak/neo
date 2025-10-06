@@ -2,7 +2,7 @@
 ## 
 ## Copyright (C) Trayambak Rai (xtrayambak at disroot dot org)
 import std/[os, osproc, tables, sequtils, strutils, times]
-import pkg/[semver, shakar, floof, pretty]
+import pkg/[semver, shakar, floof, results]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
 import
@@ -57,7 +57,13 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
     error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
     quit(QuitFailure)
 
-  var project = loadProject(sourceFile)
+  var project: Project
+
+  try:
+    project = loadProject(sourceFile)
+  except CatchableError as exc:
+    error "Failed to load project: <red>" & exc.msg & "<reset>"
+    quit(QuitFailure)
 
   if project.binaries.len < 1:
     error "This project has no compilable binaries."
@@ -258,42 +264,31 @@ proc searchPackageCommand(args: Input) =
   # stdout.write('\n')
   # displayMessage("<yellow>tip<reset>", "To get more information on a particular package, run `<blue>neo info <package><reset>`")
 
-proc installPackageCommand(args: Input) =
-  var
-    directory = "src"
-    firstArgumentUsed = false
-
-  let sourceFile =
-    if args.arguments.len > 0:
-      directory = args.arguments[0] / "src"
-      firstArgumentUsed = true
-      args.arguments[0] / "neo.yml"
-    else:
-      getCurrentDir() / "neo.yml"
-
-  if not fileExists(sourceFile):
-    error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
-    quit(QuitFailure)
-
-  var project = loadProject(sourceFile)
+proc installBinaryProject(
+    args: Input,
+    directory: string,
+    project: Project,
+    deps: seq[Dependency],
+    graph: SolvedGraph,
+) =
   if project.binaries.len < 1:
     error "This project exposes no binary outputs!"
     quit(QuitFailure)
 
+  let version = project.version
+  if !version:
+    error "Cannot parse the version of project <yellow>" & project.name &
+      "<reset>: <red>" & version.error() & "<reset>"
+    quit(QuitFailure)
+
+  let versionStr = $(&version)
+
+  displayMessage(
+    "<green>Installing<reset>",
+    "binaries for " & project.name & "@<blue>" & versionStr & "<reset>",
+  )
+
   var toolchain = newToolchain(project.toolchain.version)
-
-  var
-    deps: seq[Dependency]
-    graph: SolvedGraph
-
-  try:
-    (deps, graph) = project.solveDependencies()
-  except CannotResolveDependencies as exc:
-    error exc.msg
-    quit(QuitFailure)
-  except CloneFailed as exc:
-    error exc.msg
-    quit(QuitFailure)
 
   var fail = false
   for binaryName in project.binaries:
@@ -347,6 +342,70 @@ proc installPackageCommand(args: Input) =
     "Make sure to add " & (getNeoDir() / "bin") &
       " to your <blue>PATH<reset> environment variable to run these binaries.",
   )
+
+proc installLibraryProject(args: Input, project: Project, directory: string) =
+  let version = project.version
+  if !version:
+    error "Cannot parse the version of project <yellow>" & project.name &
+      "<reset>: <red>" & version.error() & "<reset>"
+    quit(QuitFailure)
+
+  let versionStr = $(&version)
+
+  displayMessage(
+    "<green>Installing<reset>",
+    "library " & project.name & "@<blue>" & versionStr & "<reset>",
+  )
+
+  copyDir(
+    directory / "src" / project.name, getDirectoryForPackage(project.name, versionStr)
+  )
+
+proc installPackageCommand(args: Input) =
+  var
+    directory = "src"
+    firstArgumentUsed = false
+
+  let sourceFile =
+    if args.arguments.len > 0:
+      directory = args.arguments[0] / "src"
+      firstArgumentUsed = true
+      args.arguments[0] / "neo.yml"
+    else:
+      getCurrentDir() / "neo.yml"
+
+  if not fileExists(sourceFile):
+    error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
+    quit(QuitFailure)
+
+  var
+    project = loadProject(sourceFile)
+    deps: seq[Dependency]
+    graph: SolvedGraph
+
+  try:
+    (deps, graph) = project.solveDependencies()
+  except CannotResolveDependencies as exc:
+    error exc.msg
+    quit(QuitFailure)
+  except CloneFailed as exc:
+    error exc.msg
+    quit(QuitFailure)
+
+  case project.kind
+  of ProjectKind.Binary:
+    installBinaryProject(
+      args = args, directory = directory, project = project, deps = deps, graph = graph
+    )
+  of ProjectKind.Library:
+    installLibraryProject(args = args, project = project, directory = directory)
+  of ProjectKind.Hybrid:
+    # Install the library components first, as the binary
+    # portions might depend on them.
+    installLibraryProject(args = args, project = project, directory = directory)
+    installBinaryProject(
+      args = args, directory = directory, project = project, deps = deps, graph = graph
+    )
 
 proc syncIndicesCommand(args: Input) =
   discard fetchPackageList(DefaultPackageList)
