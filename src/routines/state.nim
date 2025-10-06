@@ -6,7 +6,6 @@ import ./[neo_directory]
 
 type State* = LevelDb
 
-# TODO: On Linux, we should ideally store this state in `~/.local/state/neo`
 proc getNeoState*(): State =
   let dir = getNeoDir()
   discard existsOrCreateDir(dir)

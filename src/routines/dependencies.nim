@@ -254,7 +254,6 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
         some(downloadPackageFromURL(urlString, dest = none(string), pkg = dep))
 
   # Now, we'll load up a Neo project if it exists for that project.
-  # TODO: Load .nimble files as projects too, atleast for now.
   let
     projectDir = &finalDest
     neoFilePath = projectDir / "neo.yml"
