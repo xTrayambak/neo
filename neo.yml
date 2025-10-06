@@ -2,7 +2,7 @@ name: neo
 backend: C
 license: "BSD-3-Clause"
 kind: Binary
-version: 0.1.0
+version: 0.1.1
 binaries: [neo]
 toolchain:
   version: 2.2.0
