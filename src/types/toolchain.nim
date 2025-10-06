@@ -35,7 +35,7 @@ proc findNimExe*(toolchain: var Toolchain) {.sideEffect.} =
         )[0]
       )
 
-    if version == toolchain.getVersion():
+    if version >= toolchain.getVersion():
       # We found a match.
       toolchain.cachedNimPath = some(nim)
       return
