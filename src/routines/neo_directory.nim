@@ -3,11 +3,16 @@ import std/[os]
 import pkg/[curly, shakar]
 import ../[argparser]
 
-const OfficialPackageLists* = ["https://nim-lang.org/nimble/packages.json"]
-
+{.push inline.}
 when defined(linux):
   proc getDataDir(): string =
     getHomeDir() / ".local" / "share"
+
+else:
+  proc getDataDir(): string =
+    getHomeDir() / ".neo"
+
+{.pop.}
 
 proc getNeoDir*(input: Input = default(Input)): string =
   if (let flag = input.flag("neo-directory-override"); *flag):
