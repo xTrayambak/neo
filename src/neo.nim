@@ -412,54 +412,6 @@ proc syncIndicesCommand(args: Input) =
   discard fetchPackageList(DefaultPackageList)
   setLastIndexSyncTime(epochTime())
 
-proc formatProjectCommand(args: Input) =
-  # TODO: Global formatter settings that'd live in the user's config
-  # at `~/.config/neo/config.yml`. Implement this when the config stuff
-  # is implemented.
-  var
-    directory = "src"
-    firstArgumentUsed = false
-
-  let sourceFile =
-    if args.arguments.len > 0:
-      directory = args.arguments[0] / "src"
-      firstArgumentUsed = true
-      args.arguments[0] / "neo.yml"
-    else:
-      getCurrentDir() / "neo.yml"
-
-  if not fileExists(sourceFile):
-    error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
-    quit(QuitFailure)
-
-  let project = loadProject(sourceFile)
-  let executable = findExe(project.formatter)
-
-  if executable.len < 1:
-    error "The formatter <blue>" & project.formatter & "<reset> was not found."
-    error "Are you sure that it is installed and in your system's <blue>PATH<reset>?"
-    quit(QuitFailure)
-
-  displayMessage(
-    "<blue>Formatting<reset>",
-    project.name & " via <green>" & project.formatter & "<reset>",
-  )
-
-  let code = (
-    case project.formatter
-    of "nimpretty", "nph":
-      execCmd(executable & ' ' & getCurrentDir())
-    else:
-      error "Unknown formatter: <red>" & project.formatter & "<reset>."
-      error "Formatters recognized by Neo are: <blue>nph<reset> and <blue>nimpretty<reset>."
-      -1
-  )
-
-  if code != 0:
-    error "The formatter <red>" & project.formatter &
-      "<reset> exited with a non-zero exit code (" & $code & ')'
-    quit(QuitFailure)
-
 proc showInfoLegacyCommand(path: string, package: PackageListItem) =
   ## Show the information of a legacy (Nimble-only) package.
   let nimbleFilePath = findNimbleFile(path)
@@ -646,8 +598,6 @@ proc main() {.inline.} =
     installPackageCommand(args)
   of "sync":
     syncIndicesCommand(args)
-  of "fmt":
-    formatProjectCommand(args)
   of "info":
     showInfoCommand(args)
   of "add":

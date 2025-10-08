@@ -18,4 +18,3 @@ dependencies:
   - leveldb >= 0.4.1
   - url >= 0.1.1
   - toml_serialization >= 0.2.18
-formatter: nph
