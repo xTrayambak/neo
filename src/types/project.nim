@@ -1,5 +1,5 @@
 import std/[streams, strutils, hashes]
-import pkg/[yaml, results, semver, pretty]
+import pkg/[toml_serialization, results, semver, pretty]
 import ./[toolchain, backend]
 
 type
@@ -49,11 +49,9 @@ type
     license*: string
     kind*: ProjectKind
     version: string
-    binaries* {.defaultVal: @[].}: seq[string]
+    binaries*: seq[string] = @[]
     toolchain*: Toolchain
     dependencies*: seq[string]
-
-    formatter* {.defaultVal: "nimpretty".}: string
 
 func version*(project: Project): Result[semver.Version, string] {.inline.} =
   try:
@@ -195,10 +193,7 @@ func newProject*(
   Project(name: name, license: license, kind: kind, toolchain: toolchain)
 
 proc save*(project: Project, path: string) =
-  var stream = newFileStream(path, fmWrite)
-  Dumper().dump(project, stream)
-  stream.close()
+  Toml.saveFile(path, project)
 
 proc loadProject*(file: string): Project {.inline, sideEffect.} =
-  var stream = newFileStream(file, fmRead)
-  stream.load(result)
+  Toml.decode(readFile(file), Project)

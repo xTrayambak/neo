@@ -1,5 +1,5 @@
 import std/[os, streams, strutils]
-import pkg/[yaml]
+import pkg/toml_serialization
 import ../types/[project]
 import ../[output], ./git
 
