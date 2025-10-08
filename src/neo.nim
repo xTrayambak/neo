@@ -586,18 +586,21 @@ proc migrateCommand(args: Input) =
 
   displayMessage("<green>Migrating<reset>", "<blue>" & projectName & "<reset> to Neo")
 
+  # FIXME: Surely we can make this less awful.
+  let
+    hasBin = data.bin.len > 0
+    hasLib = data.hasInstallExt
+
   let kind =
-    if data.bin.len > 0 and data.hasInstallExt:
+    if hasBin and hasLib:
       # Hybrid
       ProjectKind.Hybrid
-    elif data.bin.len > 0 and not data.hasInstallExt:
+    elif hasBin and not hasLib:
       # Binary
       ProjectKind.Binary
-    elif data.bin.len < 1 and data.hasInstallExt:
-      ProjectKind.Library
     else:
-      unreachable
-      ProjectKind.Hybrid
+      # Library
+      ProjectKind.Library
 
   var project = newProject(
     name = projectName, license = data.license, kind = kind, toolchain = Toolchain()
