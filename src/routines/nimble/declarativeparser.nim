@@ -8,7 +8,6 @@ import std/strutils
 
 import compiler/[ast, idents, msgs, syntaxes, options, pathutils, lineinfos]
 import compiler/[renderer]
-from compiler/nimblecmd import getPathVersionChecksum
 import std/[tables, sequtils, strscans, strformat, os, options]
 
 type NimbleFileInfo* = object
@@ -23,6 +22,7 @@ type NimbleFileInfo* = object
   bin*: Table[string, string]
   hasInstallHooks*: bool
   hasErrors*: bool
+  hasInstallExt*: bool
   nestedRequires*: bool
     #if true, the requires section contains nested requires meaning that the package is incorrectly defined
   declarativeParserErrorLines*: seq[string]
@@ -177,6 +177,8 @@ proc extract(n: PNode, conf: ConfigRef, result: var NimbleFileInfo) =
           result.bin[bin] = bin
         else:
           result.bin[bin] = bin
+    elif n[0].kind == nkIdent and eqIdent(n[0].ident.s, "installExt"):
+      result.hasInstallExt = extractSeqLiteral(n[1], conf, "installExt").len > 0
     else:
       discard
   else:

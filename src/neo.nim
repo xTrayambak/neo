@@ -2,7 +2,8 @@
 ## 
 ## Copyright (C) Trayambak Rai (xtrayambak at disroot dot org)
 import std/[os, osproc, tables, sequtils, strutils, times]
-import pkg/[semver, shakar, floof, results]
+import
+  pkg/[semver, shakar, floof, results, toml_serialization, toml_serialization/value_ops]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
 import
@@ -50,9 +51,9 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
   let sourceFile =
     if args.arguments.len > 0:
       directory = args.arguments[0] / "src"
-      args.arguments[0] / "neo.yml"
+      args.arguments[0] / "neo.toml"
     else:
-      getCurrentDir() / "neo.yml"
+      getCurrentDir() / "neo.toml"
 
   if not fileExists(sourceFile):
     error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
@@ -62,11 +63,14 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
 
   try:
     project = loadProject(sourceFile)
-  except CatchableError as exc:
-    error "Failed to load project: <red>" & exc.msg & "<reset>"
+  except TomlFieldReadingError as exc:
+    error "Failed to load project: " & exc.error.msg
+    quit(QuitFailure)
+  except TomlError as exc:
+    error "Failed to load project: " & exc.msg
     quit(QuitFailure)
 
-  if project.binaries.len < 1:
+  if project.package.binaries.len < 1:
     error "This project has no compilable binaries."
     quit(QuitFailure)
 
@@ -98,17 +102,20 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
     quit(QuitFailure)
 
   var failure = false
-  for binFile in project.binaries:
+  for binFile in project.package.binaries:
     displayMessage(
       "<yellow>compiling<reset>",
-      "<green>" & binFile & "<reset> using the <blue>" & project.backend.toHumanString() &
-        "<reset> backend",
+      "<green>" & binFile & "<reset> using the <blue>" &
+        project.package.backend.toHumanString() & "<reset> backend",
     )
     let stats = toolchain.compile(
-      project.backend,
+      project.package.backend,
       directory / binFile & ".nim",
       CompilationOptions(
-        outputFile: binFile, extraFlags: extraFlags, appendPaths: getDepPaths(graph)
+        outputFile: binFile,
+        extraFlags:
+          extraFlags & " --define:NimblePkgVersion=" & $project.package.version,
+        appendPaths: getDepPaths(graph),
       ),
     )
 
@@ -139,9 +146,9 @@ proc runPackageCommand(args: Input) =
     if args.arguments.len > 0:
       directory = args.arguments[0] / "src"
       firstArgumentUsed = true
-      args.arguments[0] / "neo.yml"
+      args.arguments[0] / "neo.toml"
     else:
-      getCurrentDir() / "neo.yml"
+      getCurrentDir() / "neo.toml"
 
   if not fileExists(sourceFile):
     error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
@@ -149,19 +156,19 @@ proc runPackageCommand(args: Input) =
 
   var project = loadProject(sourceFile)
   let binaryName = block:
-    if project.binaries.len > 1:
+    if project.package.binaries.len > 1:
       let pos = if firstArgumentUsed: 1 else: 0
 
       if args.arguments.len < pos:
         error "Expected binary file to run. Choose between the following:"
-        for bin in project.binaries:
+        for bin in project.package.binaries:
           displayMessage("", "<green>" & bin & "<reset>")
 
         quit(QuitFailure)
 
       args.arguments[pos]
     else:
-      project.binaries[0]
+      project.package.binaries[0]
 
   var toolchain = newToolchain(project.toolchain.version)
 
@@ -180,14 +187,18 @@ proc runPackageCommand(args: Input) =
 
   displayMessage(
     "<yellow>compiling<reset>",
-    "<green>" & binaryName & "<reset> using the <blue>" & project.backend.toHumanString() &
-      "<reset> backend",
+    "<green>" & binaryName & "<reset> using the <blue>" &
+      project.package.backend.toHumanString() & "<reset> backend",
   )
 
   let stats = toolchain.compile(
-    project.backend,
+    project.package.backend,
     directory / binaryName & ".nim",
-    CompilationOptions(outputFile: binaryName, appendPaths: getDepPaths(graph)),
+    CompilationOptions(
+      outputFile: binaryName,
+      extraFlags: "--define:NimblePkgVersion=" & $project.package.version,
+      appendPaths: getDepPaths(graph),
+    ),
   )
   if stats.successful:
     displayMessage(
@@ -272,7 +283,7 @@ proc installBinaryProject(
     deps: seq[Dependency],
     graph: SolvedGraph,
 ) =
-  if project.binaries.len < 1:
+  if project.package.binaries.len < 1:
     error "This project exposes no binary outputs!"
     quit(QuitFailure)
 
@@ -292,19 +303,21 @@ proc installBinaryProject(
   var toolchain = newToolchain(project.toolchain.version)
 
   var fail = false
-  for binaryName in project.binaries:
+  for binaryName in project.package.binaries:
     displayMessage(
       "<yellow>compiling<reset>",
       "<green>" & binaryName & "<reset> using the <blue>" &
-        project.backend.toHumanString() & "<reset> backend",
+        project.package.backend.toHumanString() & "<reset> backend",
     )
 
     let stats = toolchain.compile(
-      project.backend,
+      project.package.backend,
       directory / binaryName & ".nim",
       CompilationOptions(
         outputFile: getNeoDir() / "bin" / binaryName,
-        extraFlags: "--define:release --define:speed",
+        extraFlags:
+          "--define:release --define:speed --define:NimblePkgVersion=" &
+          $project.package.version,
         appendPaths: getDepPaths(graph),
       ),
     )
@@ -335,8 +348,8 @@ proc installBinaryProject(
 
   displayMessage(
     "<green>Installed<reset>",
-    $project.binaries.len & " binar" & (if project.binaries.len == 1: "y" else: "ies") &
-      " successfully.",
+    $project.package.binaries.len & " binar" &
+      (if project.package.binaries.len == 1: "y" else: "ies") & " successfully.",
   )
   displayMessage(
     "<yellow>warning<reset>",
@@ -371,9 +384,9 @@ proc installPackageCommand(args: Input) =
     if args.arguments.len > 0:
       directory = args.arguments[0] / "src"
       firstArgumentUsed = true
-      args.arguments[0] / "neo.yml"
+      args.arguments[0] / "neo.toml"
     else:
-      getCurrentDir() / "neo.yml"
+      getCurrentDir() / "neo.toml"
 
   if not fileExists(sourceFile):
     error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
@@ -393,7 +406,7 @@ proc installPackageCommand(args: Input) =
     error exc.msg
     quit(QuitFailure)
 
-  case project.kind
+  case project.package.kind
   of ProjectKind.Binary:
     installBinaryProject(
       args = args, directory = directory, project = project, deps = deps, graph = graph
@@ -412,59 +425,11 @@ proc syncIndicesCommand(args: Input) =
   discard fetchPackageList(DefaultPackageList)
   setLastIndexSyncTime(epochTime())
 
-proc formatProjectCommand(args: Input) =
-  # TODO: Global formatter settings that'd live in the user's config
-  # at `~/.config/neo/config.yml`. Implement this when the config stuff
-  # is implemented.
-  var
-    directory = "src"
-    firstArgumentUsed = false
-
-  let sourceFile =
-    if args.arguments.len > 0:
-      directory = args.arguments[0] / "src"
-      firstArgumentUsed = true
-      args.arguments[0] / "neo.yml"
-    else:
-      getCurrentDir() / "neo.yml"
-
-  if not fileExists(sourceFile):
-    error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
-    quit(QuitFailure)
-
-  let project = loadProject(sourceFile)
-  let executable = findExe(project.formatter)
-
-  if executable.len < 1:
-    error "The formatter <blue>" & project.formatter & "<reset> was not found."
-    error "Are you sure that it is installed and in your system's <blue>PATH<reset>?"
-    quit(QuitFailure)
-
-  displayMessage(
-    "<blue>Formatting<reset>",
-    project.name & " via <green>" & project.formatter & "<reset>",
-  )
-
-  let code = (
-    case project.formatter
-    of "nimpretty", "nph":
-      execCmd(executable & ' ' & getCurrentDir())
-    else:
-      error "Unknown formatter: <red>" & project.formatter & "<reset>."
-      error "Formatters recognized by Neo are: <blue>nph<reset> and <blue>nimpretty<reset>."
-      -1
-  )
-
-  if code != 0:
-    error "The formatter <red>" & project.formatter &
-      "<reset> exited with a non-zero exit code (" & $code & ')'
-    quit(QuitFailure)
-
 proc showInfoLegacyCommand(path: string, package: PackageListItem) =
   ## Show the information of a legacy (Nimble-only) package.
   let nimbleFilePath = findNimbleFile(path)
   if !nimbleFilePath:
-    error "This package does not seem to have a `<blue>neo.yml<reset>` or a `<blue>.nimble<reset>` file."
+    error "This package does not seem to have a `<blue>neo.toml<reset>` or a `<blue>.nimble<reset>` file."
     error "Neo cannot display its information."
     quit(QuitFailure)
 
@@ -513,12 +478,12 @@ proc showInfoCommand(args: Input) =
     try:
       let
         base = &findDirectoryForPackage(args.arguments[0])
-        path = base / "neo.yml"
+        path = base / "neo.toml"
       if not fileExists(path):
         showInfoLegacyCommand(base, pkg)
         displayMessage(
           "<yellow>notice<reset>",
-          "This project only has a `<blue>.nimble<reset>` file. If you own it, consider adding a `<green>neo.yml<reset>` to it as well.",
+          "This project only has a `<blue>.nimble<reset>` file. If you own it, consider adding a `<green>neo.toml<reset>` to it as well.",
         )
         return
 
@@ -529,10 +494,12 @@ proc showInfoCommand(args: Input) =
       for tag in pkg.tags:
         tags &= colorTagSubs("<blue>#" & tag & "<reset>")
 
-      echo colorTagSubs("<green>" & project.name & "<reset> " & tags.join(" "))
+      echo colorTagSubs("<green>" & project.package.name & "<reset> " & tags.join(" "))
       echo pkg.description
-      echo colorTagSubs("<green>license:<reset> " & project.license)
-      echo colorTagSubs("<green>backend:<reset> " & project.backend.toHumanString())
+      echo colorTagSubs("<green>license:<reset> " & project.package.license)
+      echo colorTagSubs(
+        "<green>backend:<reset> " & project.package.backend.toHumanString()
+      )
       echo colorTagSubs("<green>documentation:<reset> " & pkg.web)
     except:
       error "Failed to load project manifest for `<red>" & args.arguments[0] &
@@ -540,25 +507,27 @@ proc showInfoCommand(args: Input) =
       error "Perhaps it depends on a Nimble file instead of a Neo file?"
       quit(QuitFailure)
   of 0:
-    let path = getCurrentDir() / "neo.yml"
+    let path = getCurrentDir() / "neo.toml"
     if not fileExists(path):
-      error "No `<blue>neo.yml<reset>` file was found in the current working directory."
+      error "No `<blue>neo.toml<reset>` file was found in the current working directory."
       quit(QuitFailure)
 
     let project = loadProject(path)
-    echo colorTagSubs("<green>" & project.name & "<reset>\n")
+    echo colorTagSubs("<green>" & project.package.name & "<reset>\n")
     echo colorTagSubs(
-      "<green>backend<reset>: " & project.backend.toHumanString & " (`" &
-        $project.backend & "`)"
+      "<green>backend<reset>: " & project.package.backend.toHumanString & " (`" &
+        $project.package.backend & "`)"
     )
     echo colorTagSubs(
-      "<green>license<reset>: " &
-        (if project.license.len > 0: project.license else: "<red>unknown<reset>")
+      "<green>license<reset>: " & (
+        if project.package.license.len > 0: project.package.license
+        else: "<red>unknown<reset>"
+      )
     )
 
-    if project.binaries.len > 0:
+    if project.package.binaries.len > 0:
       echo colorTagSubs("<green>binaries<reset>:")
-      for bin in project.binaries:
+      for bin in project.package.binaries:
         echo colorTagSubs("  * <blue>" & bin & "<reset>")
   else:
     unreachable
@@ -568,9 +537,9 @@ proc addPackageCommand(args: Input) =
     error "`<red>neo add<reset>` expects atleast one argument, got none instead."
     quit(QuitFailure)
 
-  let path = getCurrentDir() / "neo.yml"
+  let path = getCurrentDir() / "neo.toml"
   if not fileExists(path):
-    error "No `<blue>neo.yml<reset>` file was found"
+    error "No `<blue>neo.toml<reset>` file was found"
 
   var project = loadProject(path)
 
@@ -603,6 +572,71 @@ proc addPackageCommand(args: Input) =
     project.save(path)
 
   quit(move(code))
+
+proc migrateCommand(args: Input) =
+  let nimbleFile = findNimbleFile(getCurrentDir())
+  if !nimbleFile:
+    error "Cannot find any .nimble file in this directory, migration cannot start."
+    quit(QuitFailure)
+
+  let
+    nimble = &nimbleFile
+    data = extractRequiresInfo(nimble)
+    projectName = nimble.splitFile().name
+
+  displayMessage("<green>Migrating<reset>", "<blue>" & projectName & "<reset> to Neo")
+
+  let kind =
+    if data.bin.len > 0 and data.hasInstallExt:
+      # Hybrid
+      ProjectKind.Hybrid
+    elif data.bin.len > 0 and not data.hasInstallExt:
+      # Binary
+      ProjectKind.Binary
+    elif data.bin.len < 1 and data.hasInstallExt:
+      ProjectKind.Library
+    else:
+      unreachable
+      ProjectKind.Hybrid
+
+  var project = newProject(
+    name = projectName, license = data.license, kind = kind, toolchain = Toolchain()
+  )
+
+  if data.backend.len > 0:
+    project.package.backend = data.backend.toBackend()
+  project.package.version = data.version
+  project.dependencies = TomlValueRef(kind: TomlKind.Table, tableVal: TomlTableRef.new)
+
+  for bin, _ in data.bin:
+    project.package.binaries &= bin
+
+  for req in data.requires:
+    let pkgRefOpt = parsePackageRefExpr(req)
+    if !pkgRefOpt:
+      error "Can't parse requirement of package: <red>" & req & "<reset>"
+      quit(QuitFailure)
+
+    let pkgRef = &pkgRefOpt
+    if pkgRef.name == "nim":
+      # TODO: Ideally, we should check the constraint here as well.
+      # But hey, surely nothing will go wrong.
+      project.toolchain.version = $pkgRef.version
+    else:
+      project.dependencies.tableVal[pkgRef.name] = TomlValueRef(
+        kind: TomlKind.String, stringVal: $pkgRef.constraint & ' ' & $pkgRef.version
+      )
+
+  if data.tasks.len > 0:
+    displayMessage(
+      "<yellow>warning<reset>",
+      "You seem to have some tasks in your Nimble project. Unfortunately, Neo does not support tasks as of now.",
+    )
+
+  displayMessage(
+    "<green>Migrated<reset>", "<blue>" & projectName & "<reset> to Neo successfully."
+  )
+  project.save(getCurrentDir() / "neo.toml")
 
 proc showHelpCommand() {.noReturn, sideEffect.} =
   echo "Neo is a package manager for Nim"
@@ -646,12 +680,12 @@ proc main() {.inline.} =
     installPackageCommand(args)
   of "sync":
     syncIndicesCommand(args)
-  of "fmt":
-    formatProjectCommand(args)
   of "info":
     showInfoCommand(args)
   of "add":
     addPackageCommand(args)
+  of "migrate":
+    migrateCommand(args)
   else:
     if args.command.len < 1:
       showHelpCommand()

@@ -1,5 +1,5 @@
-import std/[streams, strutils, hashes]
-import pkg/[yaml, results, semver, pretty]
+import std/[streams, strutils, tables, hashes]
+import pkg/[toml_serialization, results, semver, pretty, url]
 import ./[toolchain, backend]
 
 type
@@ -43,21 +43,47 @@ type
     a*, b*: Version
     aCons*, bCons*: VerConstraint
 
-  Project* = object
+  ProjectPackageInfo* = object
     name*: string
-    backend*: Backend
+    version*: string
     license*: string
     kind*: ProjectKind
-    version: string
-    binaries* {.defaultVal: @[].}: seq[string]
-    toolchain*: Toolchain
-    dependencies*: seq[string]
+    backend*: Backend
+    binaries*: seq[string] = @[]
 
-    formatter* {.defaultVal: "nimpretty".}: string
+  Project* = object
+    package*: ProjectPackageInfo
+    toolchain*: Toolchain
+    dependencies*: TomlValueRef
+
+func `$`*(constraint: VerConstraint): string {.raises: [], inline.} =
+  case constraint
+  of VerConstraint.None: ""
+  of VerConstraint.Equal: "=="
+  of VerConstraint.GreaterThan: ">"
+  of VerConstraint.GreaterThanEqual: ">="
+  of VerConstraint.LesserThan: "<"
+  of VerConstraint.LesserThanEqual: "<="
+
+func name*(project: Project): string {.inline.} =
+  project.package.name
+
+func dependencies*(project: Project): seq[string] {.inline.} =
+  var deps = newSeqOfCap[string](project.dependencies.tableVal.len - 1)
+  for key, value in project.dependencies.tableVal:
+    var strV = value.stringVal
+    if strV[0] notin {'>', '=', '<'}:
+      # If the package's version constraint doesn't begin
+      # with a constraint symbol, automatically prefix it with `==`
+      strV = "==" & strV
+
+    deps &= key & ' ' & ensureMove(strV)
+
+  ensureMove(deps)
 
 func version*(project: Project): Result[semver.Version, string] {.inline.} =
   try:
-    return ok(parseVersion(project.version))
+    return ok(parseVersion(project.package.version))
   except semver.ParseError as exc:
     return err(exc.msg)
 
@@ -175,9 +201,10 @@ func parsePackageRefExpr*(expr: string): Result[PackageRef, PRefParseError] =
   ok(ensureMove(pkg))
 
 func getDependencies*(project: Project): seq[PackageRef] =
-  var res = newSeq[PackageRef](project.dependencies.len)
+  let deps = project.dependencies()
+  var res = newSeqOfCap[PackageRef](deps.len)
 
-  for i, dep in project.dependencies:
+  for dep in deps:
     let pref = parsePackageRefExpr(dep)
     if pref.isErr:
       raise newException(
@@ -185,20 +212,63 @@ func getDependencies*(project: Project): seq[PackageRef] =
         "Cannot resolve dependency `<red>" & dep & "`<reset>: " & $pref.error(),
       )
 
-    res[i] = pref.get()
+    res &= pref.get()
 
   move(res)
 
 func newProject*(
     name: string, license: string, kind: ProjectKind, toolchain: Toolchain
 ): Project {.inline.} =
-  Project(name: name, license: license, kind: kind, toolchain: toolchain)
+  Project(
+    package: ProjectPackageInfo(name: name, license: license, kind: kind),
+    toolchain: toolchain,
+  )
 
 proc save*(project: Project, path: string) =
-  var stream = newFileStream(path, fmWrite)
-  Dumper().dump(project, stream)
-  stream.close()
+  var buffer = newStringOfCap(512)
+
+  # We _COULD_ use nim_toml_serialization's TomlWriter
+  # but its output is hideous. As a consequence,
+  # we must update this every time the manifest format changes.
+  buffer &= "[package]\n"
+  buffer &= "name = \"$1\"\n" % [project.package.name]
+  buffer &= "version = \"$1\"\n" % [$project.package.version]
+  buffer &= "license = \"$1\"\n" % [project.package.license]
+  buffer &= "kind = \"$1\"\n" % [$project.package.kind]
+  buffer &= "backend = \"$1\"\n" % [$project.package.backend]
+
+  var bins = newSeq[string](project.package.binaries.len)
+  for i, bin in project.package.binaries:
+    bins[i] = '"' & bin & '"'
+
+  buffer &= "binaries = [$1]\n" % [move(bins).join(", ")]
+
+  buffer &= "\n[toolchain]\n"
+  buffer &= "version = \"$1\"\n" % [project.toolchain.version]
+
+  let depsSize = project.dependencies.tableVal.len
+  var currDep = 0
+  buffer &= "\ndependencies = {\n"
+  for name, cons in project.dependencies.tableVal:
+    let processedName =
+      if tryParseUrl(name).isOk:
+        # If `name` is a URL, we need to quote it.
+        '"' & name & '"'
+      else:
+        # Otherwise, we'll copy it as-is.
+        name
+
+    buffer &= "   $1 = \"$2\"" % [processedName, cons.stringVal]
+
+    if currDep < depsSize - 1:
+      buffer &= ",\n"
+    else:
+      buffer &= '\n'
+  buffer &= '}'
+
+  writeFile(path, ensureMove(buffer))
 
 proc loadProject*(file: string): Project {.inline, sideEffect.} =
-  var stream = newFileStream(file, fmRead)
-  stream.load(result)
+  return Toml.decode(readFile(file), Project, flags = {TomlInlineTableNewline})
+
+export TomlError, TomlFieldReadingError

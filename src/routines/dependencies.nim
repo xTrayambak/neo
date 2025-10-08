@@ -3,7 +3,7 @@
 ## but once we introduce version constraints, we'll need a smarter solver,
 ## similar to how Nimble has a SAT solver.
 import std/[os, options, strutils, tables, tempfiles]
-import pkg/[url, results, shakar, semver]
+import pkg/[url, results, shakar, semver, toml_serialization]
 import ../types/[project, package_lists]
 import
   ../routines/[package_lists, forge_aliases, git, neo_directory, state],
@@ -108,7 +108,7 @@ proc inferDestPackageName*(dir: string): string =
     return splitFile(&nimbleFile).name
 
   # Else, we'll assume this is a Neo project.
-  let neoFilePath = dir / "neo.yml"
+  let neoFilePath = dir / "neo.toml"
   if not fileExists(neoFilePath):
     raise newException(
       CannotInferPackageName,
@@ -256,7 +256,7 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
   # Now, we'll load up a Neo project if it exists for that project.
   let
     projectDir = &finalDest
-    neoFilePath = projectDir / "neo.yml"
+    neoFilePath = projectDir / "neo.toml"
     nimbleFilePath = findNimbleFile(projectDir)
 
     neoFileExists = fileExists(neoFilePath)
@@ -266,7 +266,7 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
     displayMessage(
       "<yellow>warning<reset>",
       "<green>" & dep.name &
-        "<reset> does not have a `<blue>neo.yml<reset>` or `<blue>.nimble<reset>` file. Its dependencies will not be resolved.",
+        "<reset> does not have a `<blue>neo.toml<reset>` or `<blue>.nimble<reset>` file. Its dependencies will not be resolved.",
     )
     return
 
@@ -282,10 +282,9 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
     # If this package uses Nimble (very likely right now),
     # we need to parse a minimal subset of its dependencies so that
     # we can atleast infer all the packages we require.
-    # FIXME: This can probably be made a little less miserable.
     var info = extractRequiresInfo(&nimbleFilePath)
     var dependency = Dependency(pkgRef: dep)
-    var project = Project(name: dep.name)
+    var project = Project(package: ProjectPackageInfo(name: dep.name))
     for req in info.requires:
       let pref = block:
         let parsed = parsePackageRefExpr(req)
@@ -442,7 +441,8 @@ proc addDependencyForgeAlias*(project: var Project, url: URL) =
   ## and gets boiled down to `gh:xTrayambak/veryfunnypackageyes`.
   ##
   ## For self-hostable services, we just redirect to the main instance of that service.
-  project.dependencies &= $url
+  project.dependencies.tableVal[$url] =
+    TomlValueRef(kind: TomlKind.String, stringVal: "")
 
 proc addDependency*(project: var Project, package: string) =
   let url =
@@ -451,7 +451,7 @@ proc addDependency*(project: var Project, package: string) =
     except URLParsingError:
       none(URL)
 
-  if project.dependencies.contains(package):
+  if project.dependencies().contains(package):
     raise newException(
       PackageAlreadyDependency,
       "The package `<red>" & package & "<reset>` is already a dependency to `<blue>" &
@@ -459,7 +459,8 @@ proc addDependency*(project: var Project, package: string) =
     )
 
   if *url:
-    project.dependencies &= serialize(&url)
+    project.dependencies.tableVal[serialize(&url)] =
+      TomlValueRef(kind: TomlKind.String, stringVal: "")
   else:
     var cache: SolverCache
     cache.lists &= &lazilyFetchPackageList(DefaultPackageList)
@@ -467,4 +468,5 @@ proc addDependency*(project: var Project, package: string) =
     if !cache.find(package):
       packageNotFound(package)
 
-    project.dependencies &= package
+    project.dependencies.tableVal[package] =
+      TomlValueRef(kind: TomlKind.String, stringVal: "")
