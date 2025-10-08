@@ -384,7 +384,6 @@ proc solveDependencies(list: var seq[PackageRef]) =
 
   list = ensureMove(solved)
 
-import pkg/pretty
 proc solveDependencies*(
     project: var Project
 ): tuple[deps: seq[Dependency], graph: SolvedGraph] =
@@ -408,8 +407,6 @@ proc solveDependencies*(
   displayMessage("<green>Resolving<reset>", "dependencies")
 
   solveDependencies(refs)
-  print project.dependencies()
-  print refs
 
   # Now, with the fixed versions, we can go ahead and
   # download all our dependencies

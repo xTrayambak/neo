@@ -2,7 +2,8 @@
 ## 
 ## Copyright (C) Trayambak Rai (xtrayambak at disroot dot org)
 import std/[os, osproc, tables, sequtils, strutils, times]
-import pkg/[semver, shakar, floof, results]
+import
+  pkg/[semver, shakar, floof, results, toml_serialization, toml_serialization/value_ops]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
 import
@@ -63,9 +64,8 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
   try:
     project = loadProject(sourceFile)
   except TomlFieldReadingError as exc:
-    echo exc.field
-    echo exc.error.msg
-    assert off
+    error "Failed to load project: " & exc.error.msg
+    quit(QuitFailure)
   except TomlError as exc:
     error "Failed to load project: " & exc.msg
     quit(QuitFailure)
@@ -112,7 +112,10 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
       project.package.backend,
       directory / binFile & ".nim",
       CompilationOptions(
-        outputFile: binFile, extraFlags: extraFlags, appendPaths: getDepPaths(graph)
+        outputFile: binFile,
+        extraFlags:
+          extraFlags & " --define:NimblePkgVersion=" & $project.package.version,
+        appendPaths: getDepPaths(graph),
       ),
     )
 
@@ -191,7 +194,11 @@ proc runPackageCommand(args: Input) =
   let stats = toolchain.compile(
     project.package.backend,
     directory / binaryName & ".nim",
-    CompilationOptions(outputFile: binaryName, appendPaths: getDepPaths(graph)),
+    CompilationOptions(
+      outputFile: binaryName,
+      extraFlags: "--define:NimblePkgVersion=" & $project.package.version,
+      appendPaths: getDepPaths(graph),
+    ),
   )
   if stats.successful:
     displayMessage(
@@ -308,7 +315,9 @@ proc installBinaryProject(
       directory / binaryName & ".nim",
       CompilationOptions(
         outputFile: getNeoDir() / "bin" / binaryName,
-        extraFlags: "--define:release --define:speed",
+        extraFlags:
+          "--define:release --define:speed --define:NimblePkgVersion=" &
+          $project.package.version,
         appendPaths: getDepPaths(graph),
       ),
     )
@@ -564,6 +573,71 @@ proc addPackageCommand(args: Input) =
 
   quit(move(code))
 
+proc migrateCommand(args: Input) =
+  let nimbleFile = findNimbleFile(getCurrentDir())
+  if !nimbleFile:
+    error "Cannot find any .nimble file in this directory, migration cannot start."
+    quit(QuitFailure)
+
+  let
+    nimble = &nimbleFile
+    data = extractRequiresInfo(nimble)
+    projectName = nimble.splitFile().name
+
+  displayMessage("<green>Migrating<reset>", "<blue>" & projectName & "<reset> to Neo")
+
+  let kind =
+    if data.bin.len > 0 and data.hasInstallExt:
+      # Hybrid
+      ProjectKind.Hybrid
+    elif data.bin.len > 0 and not data.hasInstallExt:
+      # Binary
+      ProjectKind.Binary
+    elif data.bin.len < 1 and data.hasInstallExt:
+      ProjectKind.Library
+    else:
+      unreachable
+      ProjectKind.Hybrid
+
+  var project = newProject(
+    name = projectName, license = data.license, kind = kind, toolchain = Toolchain()
+  )
+
+  if data.backend.len > 0:
+    project.package.backend = data.backend.toBackend()
+  project.package.version = data.version
+  project.dependencies = TomlValueRef(kind: TomlKind.Table, tableVal: TomlTableRef.new)
+
+  for bin, _ in data.bin:
+    project.package.binaries &= bin
+
+  for req in data.requires:
+    let pkgRefOpt = parsePackageRefExpr(req)
+    if !pkgRefOpt:
+      error "Can't parse requirement of package: <red>" & req & "<reset>"
+      quit(QuitFailure)
+
+    let pkgRef = &pkgRefOpt
+    if pkgRef.name == "nim":
+      # TODO: Ideally, we should check the constraint here as well.
+      # But hey, surely nothing will go wrong.
+      project.toolchain.version = $pkgRef.version
+    else:
+      project.dependencies.tableVal[pkgRef.name] = TomlValueRef(
+        kind: TomlKind.String, stringVal: $pkgRef.constraint & ' ' & $pkgRef.version
+      )
+
+  if data.tasks.len > 0:
+    displayMessage(
+      "<yellow>warning<reset>",
+      "You seem to have some tasks in your Nimble project. Unfortunately, Neo does not support tasks as of now.",
+    )
+
+  displayMessage(
+    "<green>Migrated<reset>", "<blue>" & projectName & "<reset> to Neo successfully."
+  )
+  project.save(getCurrentDir() / "neo.toml")
+
 proc showHelpCommand() {.noReturn, sideEffect.} =
   echo "Neo is a package manager for Nim"
   displayMessage(
@@ -610,6 +684,8 @@ proc main() {.inline.} =
     showInfoCommand(args)
   of "add":
     addPackageCommand(args)
+  of "migrate":
+    migrateCommand(args)
   else:
     if args.command.len < 1:
       showHelpCommand()

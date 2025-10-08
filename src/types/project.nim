@@ -1,5 +1,5 @@
 import std/[streams, strutils, tables, hashes]
-import pkg/[toml_serialization, results, semver, pretty]
+import pkg/[toml_serialization, results, semver, pretty, url]
 import ./[toolchain, backend]
 
 type
@@ -55,6 +55,15 @@ type
     package*: ProjectPackageInfo
     toolchain*: Toolchain
     dependencies*: TomlValueRef
+
+func `$`*(constraint: VerConstraint): string {.raises: [], inline.} =
+  case constraint
+  of VerConstraint.None: ""
+  of VerConstraint.Equal: "=="
+  of VerConstraint.GreaterThan: ">"
+  of VerConstraint.GreaterThanEqual: ">="
+  of VerConstraint.LesserThan: "<"
+  of VerConstraint.LesserThanEqual: "<="
 
 func name*(project: Project): string {.inline.} =
   project.package.name
@@ -216,7 +225,48 @@ func newProject*(
   )
 
 proc save*(project: Project, path: string) =
-  Toml.saveFile(path, project)
+  var buffer = newStringOfCap(512)
+
+  # We _COULD_ use nim_toml_serialization's TomlWriter
+  # but its output is hideous. As a consequence,
+  # we must update this every time the manifest format changes.
+  buffer &= "[package]\n"
+  buffer &= "name = \"$1\"\n" % [project.package.name]
+  buffer &= "version = \"$1\"\n" % [$project.package.version]
+  buffer &= "license = \"$1\"\n" % [project.package.license]
+  buffer &= "kind = \"$1\"\n" % [$project.package.kind]
+  buffer &= "backend = \"$1\"\n" % [$project.package.backend]
+
+  var bins = newSeq[string](project.package.binaries.len)
+  for i, bin in project.package.binaries:
+    bins[i] = '"' & bin & '"'
+
+  buffer &= "binaries = [$1]\n" % [move(bins).join(", ")]
+
+  buffer &= "\n[toolchain]\n"
+  buffer &= "version = \"$1\"\n" % [project.toolchain.version]
+
+  let depsSize = project.dependencies.tableVal.len
+  var currDep = 0
+  buffer &= "\ndependencies = {\n"
+  for name, cons in project.dependencies.tableVal:
+    let processedName =
+      if tryParseUrl(name).isOk:
+        # If `name` is a URL, we need to quote it.
+        '"' & name & '"'
+      else:
+        # Otherwise, we'll copy it as-is.
+        name
+
+    buffer &= "   $1 = \"$2\"" % [processedName, cons.stringVal]
+
+    if currDep < depsSize - 1:
+      buffer &= ",\n"
+    else:
+      buffer &= '\n'
+  buffer &= '}'
+
+  writeFile(path, ensureMove(buffer))
 
 proc loadProject*(file: string): Project {.inline, sideEffect.} =
   return Toml.decode(readFile(file), Project, flags = {TomlInlineTableNewline})
