@@ -1,4 +1,4 @@
-import std/[streams, strutils, hashes]
+import std/[streams, strutils, tables, hashes]
 import pkg/[toml_serialization, results, semver, pretty]
 import ./[toolchain, backend]
 
@@ -43,19 +43,38 @@ type
     a*, b*: Version
     aCons*, bCons*: VerConstraint
 
-  Project* = object
+  ProjectPackageInfo* = object
     name*: string
-    backend*: Backend
+    version*: string
     license*: string
     kind*: ProjectKind
-    version: string
+    backend*: Backend
     binaries*: seq[string] = @[]
+
+  Project* = object
+    package*: ProjectPackageInfo
     toolchain*: Toolchain
-    dependencies*: seq[string]
+    dependencies*: TomlValueRef
+
+func name*(project: Project): string {.inline.} =
+  project.package.name
+
+func dependencies*(project: Project): seq[string] {.inline.} =
+  var deps = newSeqOfCap[string](project.dependencies.tableVal.len - 1)
+  for key, value in project.dependencies.tableVal:
+    var strV = value.stringVal
+    if strV[0] notin {'>', '=', '<'}:
+      # If the package's version constraint doesn't begin
+      # with a constraint symbol, automatically prefix it with `==`
+      strV = "==" & strV
+
+    deps &= key & ' ' & ensureMove(strV)
+
+  ensureMove(deps)
 
 func version*(project: Project): Result[semver.Version, string] {.inline.} =
   try:
-    return ok(parseVersion(project.version))
+    return ok(parseVersion(project.package.version))
   except semver.ParseError as exc:
     return err(exc.msg)
 
@@ -173,9 +192,10 @@ func parsePackageRefExpr*(expr: string): Result[PackageRef, PRefParseError] =
   ok(ensureMove(pkg))
 
 func getDependencies*(project: Project): seq[PackageRef] =
-  var res = newSeq[PackageRef](project.dependencies.len)
+  let deps = project.dependencies()
+  var res = newSeqOfCap[PackageRef](deps.len)
 
-  for i, dep in project.dependencies:
+  for dep in deps:
     let pref = parsePackageRefExpr(dep)
     if pref.isErr:
       raise newException(
@@ -183,17 +203,22 @@ func getDependencies*(project: Project): seq[PackageRef] =
         "Cannot resolve dependency `<red>" & dep & "`<reset>: " & $pref.error(),
       )
 
-    res[i] = pref.get()
+    res &= pref.get()
 
   move(res)
 
 func newProject*(
     name: string, license: string, kind: ProjectKind, toolchain: Toolchain
 ): Project {.inline.} =
-  Project(name: name, license: license, kind: kind, toolchain: toolchain)
+  Project(
+    package: ProjectPackageInfo(name: name, license: license, kind: kind),
+    toolchain: toolchain,
+  )
 
 proc save*(project: Project, path: string) =
   Toml.saveFile(path, project)
 
 proc loadProject*(file: string): Project {.inline, sideEffect.} =
-  Toml.decode(readFile(file), Project)
+  return Toml.decode(readFile(file), Project, flags = {TomlInlineTableNewline})
+
+export TomlError, TomlFieldReadingError

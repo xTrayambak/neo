@@ -10,7 +10,7 @@ proc initializeProject*(project: Project) =
   var project = deepCopy(project)
   project.version = "0.1.0"
 
-  case project.kind
+  case project.package.kind
   of ProjectKind.Binary:
     createDir(project.name / "src")
     writeFile(
@@ -26,7 +26,7 @@ proc main {.inline.} =
 when isMainModule: main()
       """,
     )
-    project.binaries = @[project.name]
+    project.package.binaries = @[project.name]
   of ProjectKind.Library:
     createDir(project.name / "src")
     createDir(project.name / "src" / project.name)
@@ -84,7 +84,7 @@ proc greetInHindi*(name: string) =
 """,
     )
 
-  project.save(project.name / "neo.yml")
+  project.save(project.name / "neo.toml")
 
   if not gitInit(project.name):
     displayMessage(
