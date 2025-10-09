@@ -564,6 +564,7 @@ proc addPackageCommand(args: Input) =
       break
     except SolverError as err:
       error "neo encountered a generic solver invariant: <red>" & err.msg & "<reset>"
+      failed = true
 
   var code = QuitSuccess
   if failed:
