@@ -92,7 +92,7 @@ func `version=`*(project: var Project, input: string) {.inline, raises: [].} =
   ## of `input`
   ##
   ## **NOTE**: This routine performs no validation upon the provided input.
-  project.version = input
+  project.package.version = input
 
 func `==`*(a, b: PackageRef): bool {.inline.} =
   a.name == b.name and a.version == b.version and a.constraint == b.constraint
@@ -222,6 +222,7 @@ func newProject*(
   Project(
     package: ProjectPackageInfo(name: name, license: license, kind: kind),
     toolchain: toolchain,
+    dependencies: TomlValueRef(kind: TomlKind.Table, tableVal: TomlTableRef.new),
   )
 
 proc save*(project: Project, path: string) =

@@ -609,7 +609,7 @@ proc migrateCommand(args: Input) =
   if data.backend.len > 0:
     project.package.backend = data.backend.toBackend()
   project.package.version = data.version
-  project.dependencies = TomlValueRef(kind: TomlKind.Table, tableVal: TomlTableRef.new)
+  # project.dependencies = TomlValueRef(kind: TomlKind.Table, tableVal: TomlTableRef.new)
 
   for bin, _ in data.bin:
     project.package.binaries &= bin
