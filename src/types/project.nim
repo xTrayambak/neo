@@ -69,7 +69,7 @@ func name*(project: Project): string {.inline.} =
   project.package.name
 
 func dependencies*(project: Project): seq[string] {.inline.} =
-  var deps = newSeqOfCap[string](project.dependencies.tableVal.len - 1)
+  var deps = newSeqOfCap[string](project.dependencies.tableVal.len)
   for key, value in project.dependencies.tableVal:
     var strV = value.stringVal
     if strV[0] notin {'>', '=', '<'}:
