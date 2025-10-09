@@ -72,6 +72,9 @@ func dependencies*(project: Project): seq[string] {.inline.} =
   var deps = newSeqOfCap[string](project.dependencies.tableVal.len)
   for key, value in project.dependencies.tableVal:
     var strV = value.stringVal
+    if strV.len < 1:
+      continue
+
     if strV[0] notin {'>', '=', '<'}:
       # If the package's version constraint doesn't begin
       # with a constraint symbol, automatically prefix it with `==`
