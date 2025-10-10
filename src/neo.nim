@@ -45,7 +45,6 @@ proc initializePackageCommand(args: Input) {.noReturn.} =
 
   quit(QuitSuccess)
 
-import pretty
 proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
   var directory = "src"
   let sourceFile =
@@ -134,7 +133,7 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
   if failure:
     quit(QuitFailure)
 
-proc runPackageCommand(args: Input) =
+proc runPackageCommand(args: Input, useColors: bool) =
   var
     directory = "src"
     firstArgumentUsed = false
@@ -188,12 +187,19 @@ proc runPackageCommand(args: Input) =
       project.package.backend.toHumanString() & "<reset> backend",
   )
 
+  var extraCompilerFlags: string
+  if not hasColorSupport:
+    extraCompilerFlags &= "--colors:off "
+  else:
+    extraCompilerFlags &= "--colors:on "
+
   let stats = toolchain.compile(
     project.package.backend,
     directory / binaryName & ".nim",
     CompilationOptions(
       outputFile: binaryName,
-      extraFlags: "--define:NimblePkgVersion=" & $project.package.version,
+      extraFlags:
+        extraCompilerFlags & " --define:NimblePkgVersion=" & $project.package.version,
       appendPaths: getDepPaths(graph),
     ),
   )
@@ -279,6 +285,7 @@ proc installBinaryProject(
     project: Project,
     deps: seq[Dependency],
     graph: SolvedGraph,
+    useColors: bool = false,
 ) =
   if project.package.binaries.len < 1:
     error "This project exposes no binary outputs!"
@@ -307,14 +314,21 @@ proc installBinaryProject(
         project.package.backend.toHumanString() & "<reset> backend",
     )
 
+    var extraFlags: string
+    extraFlags &= "--define:release --define:speed "
+
+    if useColors:
+      extraFlags &= "--colors:on"
+    else:
+      extraFlags &= "--colors:off"
+
     let stats = toolchain.compile(
       project.package.backend,
       directory / binaryName & ".nim",
       CompilationOptions(
         outputFile: getNeoDir() / "bin" / binaryName,
         extraFlags:
-          "--define:release --define:speed --define:NimblePkgVersion=" &
-          $project.package.version,
+          extraFlags & " --define:NimblePkgVersion=" & $project.package.version,
         appendPaths: getDepPaths(graph),
       ),
     )
@@ -372,7 +386,7 @@ proc installLibraryProject(args: Input, project: Project, directory: string) =
     directory / "src" / project.name, getDirectoryForPackage(project.name, versionStr)
   )
 
-proc installPackageCommand(args: Input) =
+proc installPackageCommand(args: Input, useColors: bool) =
   var
     directory = "src"
     firstArgumentUsed = false
@@ -406,7 +420,12 @@ proc installPackageCommand(args: Input) =
   case project.package.kind
   of ProjectKind.Binary:
     installBinaryProject(
-      args = args, directory = directory, project = project, deps = deps, graph = graph
+      args = args,
+      directory = directory,
+      project = project,
+      deps = deps,
+      graph = graph,
+      useColors = useColors,
     )
   of ProjectKind.Library:
     installLibraryProject(args = args, project = project, directory = directory)
@@ -415,7 +434,12 @@ proc installPackageCommand(args: Input) =
     # portions might depend on them.
     installLibraryProject(args = args, project = project, directory = directory)
     installBinaryProject(
-      args = args, directory = directory, project = project, deps = deps, graph = graph
+      args = args,
+      directory = directory,
+      project = project,
+      deps = deps,
+      graph = graph,
+      useColors = useColors,
     )
 
 proc syncIndicesCommand(args: Input) =
@@ -669,13 +693,13 @@ proc main() {.inline.} =
   of "build":
     buildPackageCommand(args, output.hasColorSupport)
   of "run":
-    runPackageCommand(args)
+    runPackageCommand(args, output.hasColorSupport)
   of "search":
     searchPackageCommand(args)
   of "help":
     showHelpCommand()
   of "install":
-    installPackageCommand(args)
+    installPackageCommand(args, output.hasColorSupport)
   of "sync":
     syncIndicesCommand(args)
   of "info":
