@@ -20,16 +20,17 @@ Neo is currently a ~1.4K LoC project, and has the following features ready and w
 - [X] `neo init` command
 - [X] `neo search` command
 - [X] `neo fmt` command
-- [X] Naive dependency solver
 - [X] `neo info` command
 - [X] `neo add` command
 - [X] Forge aliases
+- [X] Dependency solver
+- [X] Proper dependency management
 
 The following are pending tasks that will hopefully be completed soon:
-- [ ] Proper dependency solver
+- [ ] Lockfiles
+- [ ] Dependency hash pinning
 - [ ] Tasks
 - [ ] Hooks
-- [ ] Proper dependency management
 
 # Building Neo
 Neo can be built using Neo itself, or via Nimble. To build it via itself, run:
