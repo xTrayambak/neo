@@ -683,7 +683,12 @@ Options:
   """
 
 proc main() {.inline.} =
-  initNeoState()
+  try:
+    initNeoState()
+  except LevelDbException:
+    error "Cannot open the Neo state."
+    error "<yellow>Tip<reset>: Another instance of Neo might be running."
+    quit(QuitFailure)
 
   let args = parseInput()
   output.hasColorSupport = output.hasColorSupport and not args.enabled("colorless", "C")

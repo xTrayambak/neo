@@ -53,3 +53,5 @@ proc addPackageUrlName*(url: string | URL, name: string) =
 
 proc setLastIndexSyncTime*(value: float64) =
   state.put("last_index_sync_time", $value)
+
+export LevelDbException
