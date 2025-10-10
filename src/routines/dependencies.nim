@@ -1,7 +1,8 @@
 ## Everything about solving a project's dependencies.
-## Currently, we use a very naive recursion-based solver
-## but once we introduce version constraints, we'll need a smarter solver,
-## similar to how Nimble has a SAT solver.
+## Currently, we use a less-advanced form of the MVS algorithm to handle
+## dependency conflicts. The highest version of a dependency is always chosen.
+##
+## Copyright (C) 2025 Trayambak Rai (xtrayambak at disroot dot org)
 import std/[os, options, strutils, tables, tempfiles]
 import pkg/[url, results, shakar, semver]
 import ../types/[project, package_lists]
@@ -301,7 +302,7 @@ proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
     unreachable
 
 proc solveDependencies(list: var seq[PackageRef]) =
-  var solved = newSeqOfCap[PackageRef](list.len - 1)
+  var solved = newSeqOfCap[PackageRef](list.len)
 
   for dep in list:
     let found = solved.find(dep.name)
@@ -309,78 +310,10 @@ proc solveDependencies(list: var seq[PackageRef]) =
       # There's no competing ref.
       solved &= dep
     else:
-      let (disputed, index) = &found
-      # Let `disputed` be X and `dep` be Y
-      # Let X's constraint be Xc and Y's constraint be Yc.
-      # There's a conflict and we need to choose either of X or Y.
+      let (preExisting, index) = &found
 
-      template chooseX() =
-        # Continue on.
-        continue
-
-      template chooseY() =
-        # Place Y at the index X exists at.
+      if preExisting.version < dep.version:
         solved[index] = dep
-
-      # Case 0.0: if Xc == None and Xy != None:
-      if disputed.constraint == VerConstraint.None and
-          dep.constraint != VerConstraint.None:
-        # Choose Y.
-        chooseY()
-
-      # Case 0.1: Vice-versa of 0.0
-      if dep.constraint == VerConstraint.None and
-          disputed.constraint != VerConstraint.None:
-        # Choose X.
-        chooseX()
-
-      # Case 1: X.ver > Y.ver && Yc == GreaterThan && Xc == GreaterThan
-      if disputed.version > dep.version and dep.constraint == VerConstraint.GreaterThan and
-          disputed.constraint == VerConstraint.GreaterThan:
-        # Choose X.
-        chooseX()
-
-      # Case 1.1: Y.ver > X.ver && Xc == GreaterThan && Yc == GreaterThan
-      if dep.version > disputed.version and
-          disputed.constraint == VerConstraint.GreaterThan:
-        # Choose Y.
-        chooseY()
-
-      # Case 2: Xc == Equal and Yc == Equal
-      if disputed.constraint == VerConstraint.Equal and
-          dep.constraint == VerConstraint.Equal:
-        # If X.ver != Y.ver, we have reached an unsolvable state.
-        # Report an error and abort resolution immediately.
-        if disputed.version != dep.version:
-          var exc = newException(ConflictingExactVersions, "")
-          exc.pkgName = disputed.name
-          exc.a = disputed.version
-          exc.b = dep.version
-
-          raise move(exc)
-        else:
-          # Otherwise, choose X as they are already equal.
-          chooseX()
-
-      template case21Impl(x, y: PackageRef) =
-        # Case 2.1: if Xc == Equal && Yc == GreaterThan || Yc == GreaterThanEqual
-        if x.constraint == VerConstraint.Equal and
-            dep.constraint in {
-              VerConstraint.GreaterThan, VerConstraint.GreaterThanEqual
-            }:
-          # Case 2.1.1: If X < Y, we have reached an unsolvable state
-          if x.version < y.version:
-            unsolvableConstraint(
-              disputed.name, x.version, y.version, x.constraint, y.constraint
-            )
-
-        # Case 2.1.2: If X > Y, we can choose X.
-        chooseX()
-
-      case21Impl(disputed, dep)
-      case21Impl(dep, disputed)
-
-      unreachable
 
   list = ensureMove(solved)
 

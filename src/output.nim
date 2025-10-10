@@ -1,4 +1,6 @@
-## Output manager
+## Output manager and routines
+##
+## Copyright (C) 2025 Trayambak Rai (xtrayambak at disroot dot org)
 import std/[strutils, posix]
 import pkg/[noise, semver]
 
