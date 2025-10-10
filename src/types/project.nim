@@ -1,5 +1,5 @@
-import std/[streams, strutils, tables, hashes]
-import pkg/[toml_serialization, results, semver, pretty, url]
+import std/[streams, strutils, tables, hashes, options]
+import pkg/[parsetoml, results, semver, pretty, url]
 import ./[toolchain, backend]
 
 type
@@ -54,7 +54,7 @@ type
   Project* = object
     package*: ProjectPackageInfo
     toolchain*: Toolchain
-    dependencies*: TomlValueRef
+    dependencies*: Table[string, string]
 
 func `$`*(constraint: VerConstraint): string {.raises: [], inline.} =
   case constraint
@@ -68,19 +68,17 @@ func `$`*(constraint: VerConstraint): string {.raises: [], inline.} =
 func name*(project: Project): string {.inline.} =
   project.package.name
 
-func dependencies*(project: Project): seq[string] {.inline.} =
-  var deps = newSeqOfCap[string](project.dependencies.tableVal.len)
-  for key, value in project.dependencies.tableVal:
-    var strV = value.stringVal
-    if strV.len < 1:
-      continue
+func getDependencies*(project: Project): seq[string] {.inline.} =
+  var deps = newSeqOfCap[string](project.dependencies.len)
+  for key, value in project.dependencies:
+    var value = value
 
-    if strV[0] notin {'>', '=', '<'}:
+    if value[0] notin {'>', '=', '<'}:
       # If the package's version constraint doesn't begin
       # with a constraint symbol, automatically prefix it with `==`
-      strV = "==" & strV
+      value = "==" & value
 
-    deps &= key & ' ' & ensureMove(strV)
+    deps &= key & ' ' & ensureMove(value)
 
   ensureMove(deps)
 
@@ -203,8 +201,8 @@ func parsePackageRefExpr*(expr: string): Result[PackageRef, PRefParseError] =
   # Return `pkg`.
   ok(ensureMove(pkg))
 
-func getDependencies*(project: Project): seq[PackageRef] =
-  let deps = project.dependencies()
+func getPackageRefs*(project: Project): seq[PackageRef] =
+  let deps = project.getDependencies()
   var res = newSeqOfCap[PackageRef](deps.len)
 
   for dep in deps:
@@ -225,7 +223,6 @@ func newProject*(
   Project(
     package: ProjectPackageInfo(name: name, license: license, kind: kind),
     toolchain: toolchain,
-    dependencies: TomlValueRef(kind: TomlKind.Table, tableVal: TomlTableRef.new),
   )
 
 proc save*(project: Project, path: string) =
@@ -250,10 +247,10 @@ proc save*(project: Project, path: string) =
   buffer &= "\n[toolchain]\n"
   buffer &= "version = \"$1\"\n" % [project.toolchain.version]
 
-  let depsSize = project.dependencies.tableVal.len
+  let depsSize = project.dependencies.len
   var currDep = 0
-  buffer &= "\ndependencies = {\n"
-  for name, cons in project.dependencies.tableVal:
+  buffer &= "\n[dependencies]\n"
+  for name, cons in project.dependencies:
     let processedName =
       if tryParseUrl(name).isOk:
         # If `name` is a URL, we need to quote it.
@@ -262,17 +259,51 @@ proc save*(project: Project, path: string) =
         # Otherwise, we'll copy it as-is.
         name
 
-    buffer &= "   $1 = \"$2\"" % [processedName, cons.stringVal]
+    buffer &= "$1 = \"$2\"" % [processedName, cons]
 
     if currDep < depsSize - 1:
-      buffer &= ",\n"
-    else:
-      buffer &= '\n'
-  buffer &= '}'
+      buffer &= "\n"
 
   writeFile(path, ensureMove(buffer))
 
-proc loadProject*(file: string): Project {.inline, sideEffect.} =
-  return Toml.decode(readFile(file), Project, flags = {TomlInlineTableNewline})
+func readProjectKind*(data: string): ProjectKind =
+  case data
+  of "Binary":
+    ProjectKind.Binary
+  of "Hybrid":
+    ProjectKind.Hybrid
+  of "Library":
+    ProjectKind.Library
+  else:
+    raise newException(ValueError, "Invalid project kind: " & data)
 
-export TomlError, TomlFieldReadingError
+proc loadProject*(file: string): Project {.inline, sideEffect.} =
+  let
+    data = parseString(readFile(file))
+    packageData = data["package"]
+    toolchainData = data["toolchain"]
+    depsData = data["dependencies"]
+
+  var project: Project
+  project.package.name = packageData["name"].getStr()
+  project.package.version = packageData["version"].getStr()
+  project.package.license = packageData["license"].getStr()
+  project.package.kind = readProjectKind(packageData["kind"].getStr())
+  project.package.backend = packageData["backend"].getStr().toBackend()
+  project.package.binaries = block:
+    let data = packageData["binaries"].getElems()
+    var list = newSeqOfCap[string](data.len)
+
+    for bin in data:
+      list &= bin.getStr()
+
+    ensureMove(list)
+
+  project.toolchain.version = toolchainData["version"].getStr()
+
+  for dep, cons in depsData.getTable():
+    project.dependencies[dep] = cons.getStr()
+
+  ensureMove(project)
+
+export TomlError

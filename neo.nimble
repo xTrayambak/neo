@@ -18,5 +18,6 @@ requires "shakar >= 0.1.0"
 requires "floof >= 1.0.0"
 requires "leveldb >= 0.4.1"
 requires "pretty >= 0.2.0"
-requires "toml_serialization >= 0.2.18"
 requires "url >= 0.1.1"
+requires "parsetoml >= 0.7.2"
+

@@ -9,15 +9,14 @@ binaries = ["neo"]
 [toolchain]
 version = "2.2.0"
 
-dependencies = {
-   semver = ">= 1.2.3",
-   jsony = ">= 1.1.5",
-   floof = ">= 1.0.0",
-   url = ">= 0.1.1",
-   shakar = ">= 0.1.0",
-   noise = ">= 0.1.10",
-   toml_serialization = ">= 0.2.18",
-   curly = ">= 1.1.1",
-   pretty = ">= 0.2.0",
-   leveldb = ">= 0.4.1",
-}
+[dependencies]
+semver = ">= 1.2.3"
+jsony = ">= 1.1.5"
+floof = ">= 1.0.0"
+url = ">= 0.1.1"
+shakar = ">= 0.1.0"
+noise = ">= 0.1.10"
+parsetoml = ">= 0.7.1"
+curly = ">= 1.1.1"
+pretty = ">= 0.2.0"
+leveldb = ">= 0.4.1"

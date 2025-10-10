@@ -3,7 +3,7 @@
 ## but once we introduce version constraints, we'll need a smarter solver,
 ## similar to how Nimble has a SAT solver.
 import std/[os, options, strutils, tables, tempfiles]
-import pkg/[url, results, shakar, semver, toml_serialization]
+import pkg/[url, results, shakar, semver]
 import ../types/[project, package_lists]
 import
   ../routines/[package_lists, forge_aliases, git, neo_directory, state],
@@ -203,7 +203,7 @@ proc downloadPackage*(
 
   downloadPackageFromURL(entry.url, some(dest), meth, pkg)
 
-proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Dependency =
+proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
   # Firstly, try to find the dep in our solver cache.
   # The first list is guaranteed to be the main
   # Nimble package index.
@@ -273,8 +273,8 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
   if neoFileExists:
     var project = loadProject(neoFilePath)
     var dependency = Dependency(pkgRef: dep)
-    for childDep in dependency.project.getDependencies():
-      dependency.deps &= handleDep(cache, project, childDep)
+    for childDep in dependency.project.getPackageRefs():
+      dependency.deps &= handleDep(cache, childDep)
 
     dependency.project = project
     return move(dependency)
@@ -293,7 +293,7 @@ proc handleDep*(cache: SolverCache, root: var Project, dep: PackageRef): Depende
         else:
           parsed.get()
 
-      dependency.deps &= handleDep(cache, project, pref)
+      dependency.deps &= handleDep(cache, pref)
 
     dependency.project = project
     return move(dependency)
@@ -392,7 +392,7 @@ proc solveDependencies*(
   # the base Nimble package index but
   # we'll eventually add a config option
   # to add other lists.
-  var refs = project.getDependencies()
+  var refs = project.getPackageRefs()
   if refs.len < 1:
     return
 
@@ -411,7 +411,7 @@ proc solveDependencies*(
   # Now, with the fixed versions, we can go ahead and
   # download all our dependencies
   for dep in refs:
-    let dep = handleDep(cache, project, dep)
+    let dep = handleDep(cache, dep)
     if dep == nil:
       continue
 
@@ -441,8 +441,7 @@ proc addDependencyForgeAlias*(project: var Project, url: URL) =
   ## and gets boiled down to `gh:xTrayambak/veryfunnypackageyes`.
   ##
   ## For self-hostable services, we just redirect to the main instance of that service.
-  project.dependencies.tableVal[$url] =
-    TomlValueRef(kind: TomlKind.String, stringVal: "")
+  project.dependencies[$url] = ""
 
 proc addDependency*(project: var Project, package: string) =
   let url =
@@ -451,22 +450,29 @@ proc addDependency*(project: var Project, package: string) =
     except URLParsingError:
       none(URL)
 
-  if project.dependencies().contains(package):
+  if project.getDependencies().contains(package):
     raise newException(
       PackageAlreadyDependency,
       "The package `<red>" & package & "<reset>` is already a dependency to `<blue>" &
         project.name & "<reset>`!",
     )
 
-  if *url:
-    project.dependencies.tableVal[serialize(&url)] =
-      TomlValueRef(kind: TomlKind.String, stringVal: "")
-  else:
-    var cache: SolverCache
+  # Download the package's latest version
+  # TODO: Ideally, `neo add` should accept versioned inputs
+  # (e.g `neo add url@0.1.3`)
+  var cache: SolverCache
+
+  if !url:
+    # If `package` isn't a URL, we need to prime the solver cache
+    # with all the package lists.
     cache.lists &= &lazilyFetchPackageList(DefaultPackageList)
 
+  let dep = handleDep(cache, PackageRef(name: package))
+
+  if *url:
+    project.dependencies[serialize(&url)] = $dep.project.package.version
+  else:
     if !cache.find(package):
       packageNotFound(package)
 
-    project.dependencies.tableVal[package] =
-      TomlValueRef(kind: TomlKind.String, stringVal: "")
+    project.dependencies[package] = $dep.project.package.version

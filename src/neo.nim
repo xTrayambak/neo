@@ -2,8 +2,7 @@
 ## 
 ## Copyright (C) Trayambak Rai (xtrayambak at disroot dot org)
 import std/[os, osproc, tables, sequtils, strutils, times]
-import
-  pkg/[semver, shakar, floof, results, toml_serialization, toml_serialization/value_ops]
+import pkg/[semver, shakar, floof, results]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
 import
@@ -46,6 +45,7 @@ proc initializePackageCommand(args: Input) {.noReturn.} =
 
   quit(QuitSuccess)
 
+import pretty
 proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
   var directory = "src"
   let sourceFile =
@@ -63,9 +63,6 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
 
   try:
     project = loadProject(sourceFile)
-  except TomlFieldReadingError as exc:
-    error "Failed to load project: " & exc.error.msg
-    quit(QuitFailure)
   except TomlError as exc:
     error "Failed to load project: " & exc.msg
     quit(QuitFailure)
@@ -610,7 +607,6 @@ proc migrateCommand(args: Input) =
   if data.backend.len > 0:
     project.package.backend = data.backend.toBackend()
   project.package.version = data.version
-  # project.dependencies = TomlValueRef(kind: TomlKind.Table, tableVal: TomlTableRef.new)
 
   for bin, _ in data.bin:
     project.package.binaries &= bin
@@ -627,9 +623,7 @@ proc migrateCommand(args: Input) =
       # But hey, surely nothing will go wrong.
       project.toolchain.version = $pkgRef.version
     else:
-      project.dependencies.tableVal[pkgRef.name] = TomlValueRef(
-        kind: TomlKind.String, stringVal: $pkgRef.constraint & ' ' & $pkgRef.version
-      )
+      project.dependencies[pkgRef.name] = $pkgRef.constraint & ' ' & $pkgRef.version
 
   if data.tasks.len > 0:
     displayMessage(

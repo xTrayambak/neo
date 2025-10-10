@@ -5,6 +5,8 @@ mkShell {
     pkg-config
     leveldb
     curl
+    clang
+    llvm
   ];
 
   LD_LIBRARY_PATH = lib.makeLibraryPath [

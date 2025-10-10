@@ -1,6 +1,6 @@
 import std/[os, osproc, strutils, options]
 import ./[compilation_options, backend]
-import pkg/[toml_serialization, semver, shakar]
+import pkg/[semver, shakar]
 
 type
   NimInvokation* = object
