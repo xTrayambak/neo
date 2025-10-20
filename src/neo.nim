@@ -569,8 +569,11 @@ proc addPackageCommand(args: Input) =
     displayMessage("<green>Adding<reset>", package & " to dependencies")
 
     try:
-      addDependency(project, package)
-      displayMessage("<green>Added<reset>", package & " to dependencies")
+      let version = addDependency(project, package)
+      displayMessage(
+        "<green>Added<reset>",
+        package & '@' & "<blue>" & version & "<reset> to dependencies",
+      )
     except PackageNotFound as err:
       error "the package `<red>" & err.package &
         "<reset>` was not found in any package indices."

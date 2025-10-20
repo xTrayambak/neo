@@ -285,6 +285,14 @@ proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
     # we can atleast infer all the packages we require.
     var info = extractRequiresInfo(&nimbleFilePath)
     var dependency = Dependency(pkgRef: dep)
+    try:
+      dependency.pkgRef.version = parseVersion(info.version)
+    except semver.ParseError as exc:
+      displayMessage(
+        "<yellow>warning<reset>",
+        "Cannot parse package's version: <red>" & info.version & "<reset>",
+      )
+
     var project = Project(package: ProjectPackageInfo(name: dep.name))
     for req in info.requires:
       let pref = block:
@@ -376,7 +384,7 @@ proc addDependencyForgeAlias*(project: var Project, url: URL) =
   ## For self-hostable services, we just redirect to the main instance of that service.
   project.dependencies[$url] = ""
 
-proc addDependency*(project: var Project, package: string) =
+proc addDependency*(project: var Project, package: string): string =
   let url =
     try:
       some(parseUrl(package))
@@ -401,11 +409,14 @@ proc addDependency*(project: var Project, package: string) =
     cache.lists &= &lazilyFetchPackageList(DefaultPackageList)
 
   let dep = handleDep(cache, PackageRef(name: package))
+  let version = $dep.pkgRef.version
 
   if *url:
-    project.dependencies[serialize(&url)] = $dep.project.package.version
+    project.dependencies[serialize(&url)] = ">= " & version
   else:
     if !cache.find(package):
       packageNotFound(package)
 
-    project.dependencies[package] = $dep.project.package.version
+    project.dependencies[package] = ">= " & version
+
+  version
