@@ -74,7 +74,7 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
 
   var extraFlags: string
   for flag, value in args.flags:
-    extraFlags &= "--" & flag & ':' & value
+    extraFlags &= "--" & flag & ':' & value & ' '
 
   if not hasColorSupport:
     extraFlags &= "--colors:off "
