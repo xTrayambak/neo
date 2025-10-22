@@ -454,6 +454,7 @@ proc showInfoLegacyCommand(path: string, package: PackageListItem) =
     error "Neo cannot display its information."
     quit(QuitFailure)
 
+  let packageName = inferNameFromNimbleFile(&nimbleFilePath)
   let fileInfo = extractRequiresInfo(&nimbleFilePath)
 
   var tags: seq[string]
@@ -461,7 +462,7 @@ proc showInfoLegacyCommand(path: string, package: PackageListItem) =
   for tag in package.tags:
     tags &= colorTagSubs("<blue>#" & tag & "<reset>")
 
-  echo colorTagSubs("<green>" & package.name & "<reset> " & tags.join(" "))
+  echo colorTagSubs("<green>" & packageName & "<reset> " & tags.join(" "))
   echo package.description
   echo colorTagSubs("<green>version:<reset> " & fileInfo.version.split(' ')[0])
   echo colorTagSubs("<green>license:<reset> " & fileInfo.license)
@@ -582,10 +583,16 @@ proc showInfoCommand(args: argparser.Input) =
       error "Perhaps it depends on a Nimble file instead of a Neo file?"
       quit(QuitFailure)
   of 0:
-    let path = getCurrentDir() / "neo.toml"
+    let
+      base = getCurrentDir()
+      path = base / "neo.toml"
     if not fileExists(path):
-      error "No `<blue>neo.toml<reset>` file was found in the current working directory."
-      quit(QuitFailure)
+      showInfoLegacyCommand(base, PackageListItem())
+      displayMessage(
+        "<yellow>notice<reset>",
+        "This project only has a `<blue>.nimble<reset>` file. If you own it, consider adding a `<green>neo.toml<reset>` to it as well. It is as simple as running <green>neo migrate<reset>!",
+      )
+      return
 
     let project = loadProject(path)
     echo colorTagSubs("<green>" & project.package.name & "<reset>\n")

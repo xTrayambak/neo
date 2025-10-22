@@ -100,6 +100,9 @@ proc findNimbleFile*(dir: string): Option[string] =
     if path.endsWith(".nimble"):
       return some(path)
 
+func inferNameFromNimbleFile*(file: string): string =
+  file.splitFile().name
+
 proc inferDestPackageName*(dir: string): string =
   # Firstly, we can check if a .nimble file exists.
   let nimbleFile = findNimbleFile(dir)
