@@ -1,6 +1,6 @@
 [package]
 name = "neo"
-version = "0.1.3"
+version = "0.1.4"
 license = "BSD-3-Clause"
 kind = "Binary"
 backend = "C"
