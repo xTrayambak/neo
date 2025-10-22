@@ -63,7 +63,7 @@ proc findDirectoryForPackage*(name: string): Option[string] =
     if kind != pcDir:
       continue
 
-    if not dir.contains(name & '-'):
+    if not dir.contains('/' & name & '-'):
       continue
 
     return some(dir)
@@ -147,10 +147,10 @@ proc downloadPackageFromURL*(
     if pkg.constraint != VerConstraint.None:
       let checkout = gitCheckout(dest, $version)
       if !checkout:
-        # Here, we need to handle a quirk.
+        # HACK: Here, we need to handle a quirk.
         # Some packages made by certain specimen
-        # like to tag their versions as 'v<version>'
-        # 
+        # like to tag their versions as 'v<version>'.
+        # Nimble seems to handle this fine.
         # Examples include araq/libcurl. Why do they do this?
         # I have no clue. We might as well account for their quirky behaviour.
         let quirkyCheckout = gitCheckout(dest, 'v' & $version)
@@ -175,6 +175,11 @@ proc downloadPackageFromURL*(
       extraName = some(name)
 
       finalDest = getDirectoryForPackage(name, $pkg.version)
+      if dirExists(finalDest):
+        # If our inferred destination is occupied,
+        # delete all of its contents.
+        removeDir(finalDest)
+
       moveDir(dest, finalDest)
 
       addPackageUrlName(url, name)

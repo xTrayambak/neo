@@ -2,7 +2,7 @@
 ## 
 ## Copyright (C) Trayambak Rai (xtrayambak at disroot dot org)
 import std/[os, osproc, tables, sequtils, strutils, times]
-import pkg/[semver, shakar, floof, results]
+import pkg/[semver, shakar, floof, results, url]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
 import
@@ -17,7 +17,7 @@ const
   # when searching for packages.
   MaxMatchesDefault* {.intdefine: "NeoSearchMaxMatchesDefault".} = 15
 
-proc initializePackageCommand(args: Input) {.noReturn.} =
+proc initializePackageCommand(args: argparser.Input) {.noReturn.} =
   if args.arguments.len < 1:
     error "<green>neo init<reset> expects 1 argument, got 0"
     quit(QuitFailure)
@@ -45,7 +45,7 @@ proc initializePackageCommand(args: Input) {.noReturn.} =
 
   quit(QuitSuccess)
 
-proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
+proc buildPackageCommand(args: argparser.Input, hasColorSupport: bool) {.noReturn.} =
   var directory = "src"
   let sourceFile =
     if args.arguments.len > 0:
@@ -133,7 +133,7 @@ proc buildPackageCommand(args: Input, hasColorSupport: bool) {.noReturn.} =
   if failure:
     quit(QuitFailure)
 
-proc runPackageCommand(args: Input, useColors: bool) =
+proc runPackageCommand(args: argparser.Input, useColors: bool) =
   var
     directory = "src"
     firstArgumentUsed = false
@@ -226,7 +226,7 @@ proc runPackageCommand(args: Input, useColors: bool) =
     )
     quit(QuitFailure)
 
-proc searchPackageCommand(args: Input) =
+proc searchPackageCommand(args: argparser.Input) =
   if args.arguments.len < 1:
     displayMessage(
       "<red>error<reset>", "This command expects one argument. It was provided none."
@@ -280,7 +280,7 @@ proc searchPackageCommand(args: Input) =
   # displayMessage("<yellow>tip<reset>", "To get more information on a particular package, run `<blue>neo info <package><reset>`")
 
 proc installBinaryProject(
-    args: Input,
+    args: argparser.Input,
     directory: string,
     project: Project,
     deps: seq[Dependency],
@@ -368,7 +368,7 @@ proc installBinaryProject(
       " to your <blue>PATH<reset> environment variable to run these binaries.",
   )
 
-proc installLibraryProject(args: Input, project: Project, directory: string) =
+proc installLibraryProject(args: argparser.Input, project: Project, directory: string) =
   let version = project.version
   if !version:
     error "Cannot parse the version of project <yellow>" & project.name &
@@ -386,7 +386,7 @@ proc installLibraryProject(args: Input, project: Project, directory: string) =
     directory / "src" / project.name, getDirectoryForPackage(project.name, versionStr)
   )
 
-proc installPackageCommand(args: Input, useColors: bool) =
+proc installPackageCommand(args: argparser.Input, useColors: bool) =
   var
     directory = "src"
     firstArgumentUsed = false
@@ -442,7 +442,7 @@ proc installPackageCommand(args: Input, useColors: bool) =
       useColors = useColors,
     )
 
-proc syncIndicesCommand(args: Input) =
+proc syncIndicesCommand(args: argparser.Input) =
   discard fetchPackageList(DefaultPackageList)
   setLastIndexSyncTime(epochTime())
 
@@ -473,15 +473,69 @@ proc showInfoLegacyCommand(path: string, package: PackageListItem) =
     discard
   echo colorTagSubs("<green>documentation:<reset> " & package.web)
 
-proc showInfoCommand(args: Input) =
+proc showInfoUrlArgument(url: URL) =
+  let url =
+    if isForgeAlias(url):
+      # If url is a forge alias, we need to expand it from an opaque
+      # URL to a proper, serialized URL.
+      expandForgeUrl(url)
+    else:
+      # Else, let url get serialized as-is.
+      serialize(url)
+
+  try:
+    discard downloadPackageFromURL(url, pkg = PackageRef(name: url))
+  except CloneFailed as err:
+    error err.msg
+    quit(QuitFailure)
+
+  # `downloadPackageFromURL()` automatically infers the package's name
+  # after it successfully downloads it, so we can get its proper name.
+  let
+    pkgName = getPackageUrlNames()[url]
+    pkgDir = &findDirectoryForPackage(pkgName)
+
+    path = pkgDir / "neo.toml"
+
+  if not fileExists(path):
+    # FIXME: Show descriptions. Also, add a description field to neo.toml!
+    showInfoLegacyCommand(
+      pkgDir,
+      PackageListItem(name: pkgName, url: url, description: "Cannot render description"),
+    )
+    displayMessage(
+      "<yellow>notice<reset>",
+      "This project only has a `<blue>.nimble<reset>` file. If you own it, consider adding a `<green>neo.toml<reset>` to it as well.",
+    )
+    return
+
+  # Load the Neo manifest.
+  let project = loadProject(path)
+
+  # for tag in pkg.tags:
+  #  tags &= colorTagSubs("<blue>#" & tag & "<reset>")
+
+  echo colorTagSubs("<green>" & pkgName & "<reset>")
+  # echo pkg.description
+  echo colorTagSubs("<green>license:<reset> " & project.package.license)
+  echo colorTagSubs("<green>backend:<reset> " & project.package.backend.toHumanString())
+
+proc showInfoCommand(args: argparser.Input) =
   # TODO: This should search all available lists once we have that working.
   if args.arguments.len > 1:
     error "`<blue>neo info<reset>` expects exactly one argument, got " &
       $args.arguments.len & " instead."
+    quit(QuitFailure)
 
   case args.arguments.len
   of 1:
     let list = &lazilyFetchPackageList(DefaultPackageList)
+    if (let url = tryParseUrl(args.arguments[0]); *url):
+      # TODO: Clean this up. There's no good way to reconcile
+      # the `neo info <url>` and `neo info <name>` codepaths.
+      showInfoUrlArgument(&url)
+      return
+
     let package = list.find(args.arguments[0])
 
     if !package:
@@ -553,7 +607,7 @@ proc showInfoCommand(args: Input) =
   else:
     unreachable
 
-proc addPackageCommand(args: Input) =
+proc addPackageCommand(args: argparser.Input) =
   if args.arguments.len < 1:
     error "`<red>neo add<reset>` expects atleast one argument, got none instead."
     quit(QuitFailure)
@@ -598,7 +652,7 @@ proc addPackageCommand(args: Input) =
 
   quit(move(code))
 
-proc migrateCommand(args: Input) =
+proc migrateCommand(args: argparser.Input) =
   let nimbleFile = findNimbleFile(getCurrentDir())
   if !nimbleFile:
     error "Cannot find any .nimble file in this directory, migration cannot start."
