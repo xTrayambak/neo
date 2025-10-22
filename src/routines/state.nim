@@ -47,7 +47,7 @@ proc addPackageUrlName*(url: string | URL, name: string) =
   # Add a package's name to a list as well as the URL it
   # was resolved from.
   var list = getPackageUrlNames()
-  list[$url] = name
+  list[(when url is URL: serialize(url) else: url)] = name
 
   state.put("package_url_resolved_names", toJson(move(list)))
 
