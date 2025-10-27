@@ -20,3 +20,5 @@ requires "leveldb >= 0.4.1"
 requires "pretty >= 0.2.0"
 requires "url >= 0.1.3"
 requires "parsetoml >= 0.7.2"
+
+requires "compiler >= 2.2.4"
