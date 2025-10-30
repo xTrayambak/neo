@@ -1,5 +1,5 @@
 import std/[strutils, tables, options]
-import pkg/[parsetoml, results, semver, url]
+import pkg/[parsetoml, results, semver, shakar, url]
 import ./[toolchain, backend]
 
 type
@@ -49,6 +49,7 @@ type
     name*: string
     version*: string
     license*: string
+    description*: Option[string]
     kind*: ProjectKind
     backend*: Backend
     binaries*: seq[string] = @[]
@@ -255,6 +256,9 @@ proc save*(project: Project, path: string) =
   # we must update this every time the manifest format changes.
   buffer &= "[package]\n"
   buffer &= "name = \"$1\"\n" % [project.package.name]
+  if *project.package.description:
+    buffer &= "description = \"$1\"\n" % [&project.package.description]
+
   buffer &= "version = \"$1\"\n" % [$project.package.version]
   buffer &= "license = \"$1\"\n" % [project.package.license]
   buffer &= "kind = \"$1\"\n" % [$project.package.kind]
@@ -320,6 +324,9 @@ proc loadProject*(file: string): Project {.inline, sideEffect.} =
       list &= bin.getStr()
 
     ensureMove(list)
+
+  if "description" in packageData:
+    project.package.description = some(packageData["description"].getStr())
 
   project.toolchain.version = toolchainData["version"].getStr()
 

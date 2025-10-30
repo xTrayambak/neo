@@ -1,7 +1,7 @@
 ## Neo - the new package manager for Nim
 ## 
 ## Copyright (C) Trayambak Rai (xtrayambak at disroot dot org)
-import std/[os, osproc, tables, strutils, times]
+import std/[os, osproc, options, tables, strutils, times]
 import pkg/[semver, shakar, floof, results, url]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
@@ -695,6 +695,9 @@ proc migrateCommand(args: argparser.Input) =
   if data.backend.len > 0:
     project.package.backend = data.backend.toBackend()
   project.package.version = data.version
+
+  if data.description.len > 0:
+    project.package.description = some(data.description)
 
   for bin, _ in data.bin:
     project.package.binaries &= bin
