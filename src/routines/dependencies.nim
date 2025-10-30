@@ -1,5 +1,5 @@
 ## Everything about solving a project's dependencies.
-## Currently, we use a less-advanced form of the MVS algorithm to handle
+## Currently, we use the MVS algorithm to handle
 ## dependency conflicts. The highest version of a dependency is always chosen.
 ##
 ## Copyright (C) 2025 Trayambak Rai (xtrayambak at disroot dot org)
@@ -219,8 +219,6 @@ proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
   if dep.name == "nim":
     return
 
-  echo "handleDep(" & dep.name & ')'
-
   var url =
     try:
       some(parseUrl(dep.name))
@@ -335,6 +333,27 @@ proc solveDependencies(list: var seq[PackageRef]) =
 
   list = ensureMove(solved)
 
+proc handleRef*(
+    cache: SolverCache,
+    dep: PackageRef,
+    newRefs: var seq[PackageRef],
+    deps: var seq[Dependency],
+) =
+  let handled = handleDep(cache, dep)
+  if handled == nil:
+    return
+
+  for child in handled.deps:
+    if child == nil:
+      continue # FIXME
+
+    newRefs &= child.pkgRef
+    deps &= child
+
+    handleRef(cache, child.pkgRef, newRefs, deps)
+
+  deps &= handled
+
 proc solveDependencies*(
     project: var Project
 ): tuple[deps: seq[Dependency], graph: SolvedGraph] =
@@ -361,17 +380,8 @@ proc solveDependencies*(
 
   # Now, with the fixed versions, we can go ahead and
   # download all our dependencies
-  for dep in refs:
-    let dep = handleDep(cache, dep)
-    if dep == nil:
-      continue
-
-    for child in dep.deps:
-      if child == nil:
-        continue # FIXME: Please fix this!!!
-      newRefs &= child.pkgRef
-
-    dependencyVec &= dep
+  for pkgRef in refs:
+    handleRef(cache, pkgRef, newRefs, dependencyVec)
 
   refs &= newRefs
   solveDependencies(refs)
