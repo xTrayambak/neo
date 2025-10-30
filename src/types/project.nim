@@ -22,11 +22,13 @@ type
     ## to commence.
     name*: string
     version*: Version
+    hash*: Option[string]
     constraint*: VerConstraint
 
   PRefParserState {.size: sizeof(uint8), pure.} = enum
     Name
     Constraint
+    Hash
     Version
 
   PRefParseError* {.size: sizeof(uint8), pure.} = enum
@@ -132,6 +134,11 @@ func parsePackageRefExpr*(expr: string): Result[PackageRef, PRefParseError] =
       of {'>', '<', '='}:
         # If c is in { '>', '<', '=' }, set state to Constraint.
         state = PRefParserState.Constraint
+      of '#':
+        # If c is a hashtag (#), set state to Hash,
+        # and increemnt the pointer by 1.
+        state = PRefParserState.Hash
+        inc i
       of strutils.Whitespace:
         # If c is whitespace, ignore it and increment the pointer by 1.
         inc i
@@ -141,6 +148,21 @@ func parsePackageRefExpr*(expr: string): Result[PackageRef, PRefParseError] =
 
         # Increment the pointer by 1.
         inc i
+    of PRefParserState.Hash:
+      # Let buff be a string.
+      var buff = newStringOfCap(size - i)
+
+      # While EOF has not been reached, 
+      while i < size:
+        # Increment the character at the pointer to buff.
+        buff &= expr[i]
+        inc i
+
+      # Set ref.hash to buffer.
+      pkg.hash = some(ensureMove(buff))
+
+      # End the loop.
+      break
     of PRefParserState.Constraint:
       # Allocate a constraint buffer, preferrably
       # accounting for the worst-case of 2 bytes.

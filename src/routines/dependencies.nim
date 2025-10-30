@@ -219,6 +219,8 @@ proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
   if dep.name == "nim":
     return
 
+  echo "handleDep(" & dep.name & ')'
+
   var url =
     try:
       some(parseUrl(dep.name))
