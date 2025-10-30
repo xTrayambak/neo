@@ -1,6 +1,6 @@
 ## Everything to do with the Neo (~/.local/share/neo) directory
 import std/[os]
-import pkg/[curly, shakar]
+import pkg/[shakar]
 import ../[argparser]
 
 {.push inline.}

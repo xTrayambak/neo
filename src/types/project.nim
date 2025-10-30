@@ -1,5 +1,5 @@
-import std/[streams, strutils, tables, hashes, options]
-import pkg/[parsetoml, results, semver, pretty, url]
+import std/[strutils, tables, options]
+import pkg/[parsetoml, results, semver, url]
 import ./[toolchain, backend]
 
 type

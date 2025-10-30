@@ -8,7 +8,7 @@ import std/strutils
 
 import compiler/[ast, idents, msgs, syntaxes, options, pathutils, lineinfos]
 import compiler/[renderer]
-import std/[tables, sequtils, strscans, strformat, os, options]
+import std/[tables, strformat, os]
 
 type NimbleFileInfo* = object
   nimbleFile*: string

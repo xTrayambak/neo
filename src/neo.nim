@@ -1,7 +1,7 @@
 ## Neo - the new package manager for Nim
 ## 
 ## Copyright (C) Trayambak Rai (xtrayambak at disroot dot org)
-import std/[os, osproc, tables, sequtils, strutils, times]
+import std/[os, osproc, tables, strutils, times]
 import pkg/[semver, shakar, floof, results, url]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]

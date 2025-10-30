@@ -1,4 +1,4 @@
-import std/[os, streams, strutils]
+import std/[os, strutils]
 import ../types/[project]
 import ../[output], ./git
 
