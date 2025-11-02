@@ -526,7 +526,7 @@ proc showInfoUrlArgument(url: URL) =
 
   echo colorTagSubs("<green>" & pkgName & "<reset>")
   if *project.package.description:
-    echo project.package.description
+    echo &project.package.description
   echo colorTagSubs("<green>version:<reset> " & project.package.version)
   echo colorTagSubs("<green>license:<reset> " & project.package.license)
   echo colorTagSubs("<green>backend:<reset> " & project.package.backend.toHumanString())
@@ -608,7 +608,7 @@ proc showInfoCommand(args: argparser.Input) =
     let project = loadProject(path)
     echo colorTagSubs("<green>" & project.package.name & "<reset>\n")
     if *project.package.description:
-      echo project.package.description
+      echo &project.package.description
     echo colorTagSubs("<green>version<reset>: " & project.package.version)
     echo colorTagSubs(
       "<green>backend<reset>: " & project.package.backend.toHumanString & " (`" &
