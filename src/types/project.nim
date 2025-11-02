@@ -250,7 +250,11 @@ func newProject*(
 ): Project {.inline.} =
   Project(
     package: ProjectPackageInfo(
-      name: name, license: license, kind: kind, description: description
+      name: name,
+      license: license,
+      kind: kind,
+      description: description,
+      version: version,
     ),
     toolchain: toolchain,
   )
