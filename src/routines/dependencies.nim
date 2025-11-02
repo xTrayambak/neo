@@ -8,7 +8,7 @@ import pkg/[url, results, shakar, semver]
 import ../types/[project, package_lists]
 import
   ../routines/[package_lists, forge_aliases, git, neo_directory, state],
-  ../routines/nimble/declarativeparser,
+  ../routines/nimble/primitiveparser,
   ../output
 
 type
@@ -291,7 +291,7 @@ proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
     # If this package uses Nimble (very likely right now),
     # we need to parse a minimal subset of its dependencies so that
     # we can atleast infer all the packages we require.
-    var info = extractRequiresInfo(&nimbleFilePath)
+    var info = parseNimbleFile(readFile(&nimbleFilePath))
     var dependency = Dependency(pkgRef: dep)
     try:
       dependency.pkgRef.version = parseVersion(info.version)

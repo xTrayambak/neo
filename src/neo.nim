@@ -8,7 +8,7 @@ import ./types/[project, toolchain, backend, compilation_options, package_lists]
 import
   ./routines/
     [initialize, package_lists, forge_aliases, state, dependencies, neo_directory],
-  ./routines/nimble/declarativeparser
+  ./routines/nimble/primitiveparser
 
 const
   NeoVersion* {.strdefine: "NimblePkgVersion".} = "0.1.0"
@@ -463,7 +463,7 @@ proc showInfoLegacyCommand(path: string, package: PackageListItem) =
     quit(QuitFailure)
 
   let packageName = inferNameFromNimbleFile(&nimbleFilePath)
-  let fileInfo = extractRequiresInfo(&nimbleFilePath)
+  let fileInfo = parseNimbleFile(readFile(&nimbleFilePath))
 
   var tags: seq[string]
 
@@ -675,7 +675,7 @@ proc migrateCommand(args: argparser.Input) =
 
   let
     nimble = &nimbleFile
-    data = extractRequiresInfo(nimble)
+    data = parseNimbleFile(readFile(nimble))
     projectName = nimble.splitFile().name
 
   displayMessage("<green>Migrating<reset>", "<blue>" & projectName & "<reset> to Neo")
