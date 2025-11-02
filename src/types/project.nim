@@ -241,10 +241,17 @@ func getPackageRefs*(project: Project): seq[PackageRef] =
   move(res)
 
 func newProject*(
-    name: string, license: string, kind: ProjectKind, toolchain: Toolchain
+    name: string,
+    license: string,
+    kind: ProjectKind,
+    version: string,
+    toolchain: Toolchain,
+    description: Option[string] = none(string),
 ): Project {.inline.} =
   Project(
-    package: ProjectPackageInfo(name: name, license: license, kind: kind),
+    package: ProjectPackageInfo(
+      name: name, license: license, kind: kind, description: description
+    ),
     toolchain: toolchain,
   )
 

@@ -31,7 +31,9 @@ proc initializePackageCommand(args: argparser.Input) {.noReturn.} =
   let
     name = args.arguments[0]
     kind = askQuestion("Project Type", ["Binary", "Library", "Hybrid"], 0)
+    version = askQuestion("Version (0.1.0)", "0.1.0")
     license = askQuestion("License (Optional)")
+    desc = askQuestion("Description (Optional)")
     toolchainVersion = askQuestion("Nim Toolchain Version", NimVersion)
 
     project = newProject(
@@ -39,6 +41,12 @@ proc initializePackageCommand(args: argparser.Input) {.noReturn.} =
       kind = ProjectKind(kind),
       license = license,
       toolchain = newToolchain(toolchainVersion),
+      description =
+        if desc.len > 0:
+          some(desc)
+        else:
+          none(string),
+      version = version,
     )
 
   initializeProject(project)
@@ -689,12 +697,15 @@ proc migrateCommand(args: argparser.Input) =
       ProjectKind.Library
 
   var project = newProject(
-    name = projectName, license = data.license, kind = kind, toolchain = Toolchain()
+    name = projectName,
+    license = data.license,
+    kind = kind,
+    toolchain = Toolchain(),
+    version = data.version,
   )
 
   if data.backend.len > 0:
     project.package.backend = data.backend.toBackend()
-  project.package.version = data.version
 
   if data.description.len > 0:
     project.package.description = some(data.description)
