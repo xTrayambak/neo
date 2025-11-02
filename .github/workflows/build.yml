@@ -1,0 +1,25 @@
+name: Build
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Nim
+      uses: iffy/install-nim@v5
+    - name: Install dependencies
+      run: nimble install -y
+
+    - name: Build
+      run: nimble build --define:release --out:neo
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Build
+        path: neo
