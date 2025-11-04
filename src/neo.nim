@@ -146,13 +146,12 @@ proc runPackageCommand(args: argparser.Input, useColors: bool) =
     directory = "src"
     firstArgumentUsed = false
 
-  let sourceFile =
+  let sourceFile = getCurrentDir() / "neo.toml"
+  let chosenBinary =
     if args.arguments.len > 0:
-      directory = args.arguments[0] / "src"
-      firstArgumentUsed = true
-      args.arguments[0] / "neo.toml"
+      some(args.arguments[0])
     else:
-      getCurrentDir() / "neo.toml"
+      none(string)
 
   if not fileExists(sourceFile):
     error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
@@ -161,16 +160,14 @@ proc runPackageCommand(args: argparser.Input, useColors: bool) =
   var project = loadProject(sourceFile)
   let binaryName = block:
     if project.package.binaries.len > 1:
-      let pos = if firstArgumentUsed: 1 else: 0
-
-      if args.arguments.len < pos:
+      if !chosenBinary:
         error "Expected binary file to run. Choose between the following:"
         for bin in project.package.binaries:
           displayMessage("", "<green>" & bin & "<reset>")
 
         quit(QuitFailure)
 
-      args.arguments[pos]
+      &chosenBinary
     else:
       project.package.binaries[0]
 
