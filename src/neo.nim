@@ -741,6 +741,11 @@ proc migrateCommand(args: argparser.Input) =
   )
   project.save(getCurrentDir() / "neo.toml")
 
+proc metaCommand() =
+  echo "Neo " & NeoVersion
+  echo "Compiled with Nim " & NimVersion
+  echo "Copyright (C) 2025 Trayambak Rai"
+
 proc showHelpCommand() {.noReturn, sideEffect.} =
   echo "Neo is a package manager for Nim"
   displayMessage(
@@ -750,14 +755,16 @@ proc showHelpCommand() {.noReturn, sideEffect.} =
   echo """
 
 Commands:
-  init   [name]                   Initialize a project.
-  build                           Build the project in the current directory, if no path is specified.
-  run                             Build and run the project in the current directory, if no path is specified.
-  search [name]                   Search the package index for a particular package.
-  help                            Show this message.
-  install                         Install binaries from the current project.
-  sync                            Synchronize the package index.
-  info   [name]                   Get more details about a particular package.
+  init   [name]                      Initialize a project.
+  build                              Build the project in the current directory, if no path is specified.
+  run                                Build and run the project in the current directory, if no path is specified.
+  search [name]                      Search the package index for a particular package.
+  help                               Show this message.
+  install                            Install binaries from the current project.
+  sync                               Synchronize the package index.
+  info   [name / url / forge alias]  Get more details about a particular package.
+  add    [name / url / forge alias]  Add a package as a dependency to your current project.
+  meta                               Show the build metadata for Neo.
 
 Options:
   --colorless, C                  Do not use ANSI-escape codes to color Neo's output. This makes Neo's output easier to parse.
@@ -794,6 +801,8 @@ proc main() {.inline.} =
     addPackageCommand(args)
   of "migrate":
     migrateCommand(args)
+  of "meta":
+    metaCommand()
   else:
     if args.command.len < 1:
       showHelpCommand()
