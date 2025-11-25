@@ -6,8 +6,10 @@ import pkg/[semver, shakar, floof, results, url]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
 import
-  ./routines/
-    [initialize, package_lists, forge_aliases, state, dependencies, neo_directory],
+  ./routines/[
+    checksumming, initialize, package_lists, forge_aliases, state, dependencies,
+    neo_directory, locking,
+  ],
   ./routines/nimble/primitiveparser
 
 const
@@ -746,6 +748,20 @@ proc metaCommand() =
   echo "Compiled with Nim " & NimVersion
   echo "Copyright (C) 2025 Trayambak Rai"
 
+proc lockCommand(args: argparser.Input) =
+  let lockfilePath =
+    if (let flagArg = args.flag("lockfile"); *flagArg):
+      &flagArg
+    else:
+      "neo.lock"
+
+  if generateLockFile(getCurrentDir(), lockfilePath):
+    displayMessage("<green>Generated<reset>", "lockfile for project successfully")
+    quit(QuitSuccess)
+
+  error "An error occurred while generating the lockfile. Please refer to the errors above."
+  quit(QuitFailure)
+
 proc showHelpCommand() {.noReturn, sideEffect.} =
   echo "Neo is a package manager for Nim"
   displayMessage(
@@ -765,6 +781,7 @@ Commands:
   info   [name / url / forge alias]  Get more details about a particular package.
   add    [name / url / forge alias]  Add a package as a dependency to your current project.
   meta                               Show the build metadata for Neo.
+  lock                               Generate a lockfile with all dependencies, transitive and direct pinned.
 
 Options:
   --colorless, C                  Do not use ANSI-escape codes to color Neo's output. This makes Neo's output easier to parse.
@@ -803,6 +820,8 @@ proc main() {.inline.} =
     migrateCommand(args)
   of "meta":
     metaCommand()
+  of "lock":
+    lockCommand(args)
   else:
     if args.command.len < 1:
       showHelpCommand()

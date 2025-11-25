@@ -1,4 +1,4 @@
-import std/[strutils, tables, options]
+import std/[os, strutils, tables, options]
 import pkg/[parsetoml, results, semver, shakar, url]
 import ./[toolchain, backend]
 
@@ -314,7 +314,7 @@ func readProjectKind*(data: string): ProjectKind =
   else:
     raise newException(ValueError, "Invalid project kind: " & data)
 
-proc loadProject*(file: string): Project {.inline, sideEffect.} =
+proc loadProject*(file: string): Project {.sideEffect.} =
   let
     data = parseString(readFile(file))
     packageData = data["package"]
@@ -345,5 +345,11 @@ proc loadProject*(file: string): Project {.inline, sideEffect.} =
     project.dependencies[dep] = cons.getStr()
 
   ensureMove(project)
+
+proc loadProjectInDir*(dir: string): Option[Project] {.inline.} =
+  if fileExists(dir / "neo.toml"):
+    return some(loadProject(dir / "neo.toml"))
+
+  none(Project)
 
 export TomlError

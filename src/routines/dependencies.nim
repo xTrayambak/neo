@@ -212,6 +212,17 @@ proc downloadPackage*(
 
   downloadPackageFromURL(entry.url, some(dest), meth, pkg)
 
+proc getDownloadURL*(cache: SolverCache, dep: PackageRef): Option[URL] =
+  let url = tryParseURL(dep.name)
+  if !url:
+    let package = cache.find(dep.name)
+    if !package:
+      return none(URL)
+
+    return some(parseURL((&package).url))
+  else:
+    some(&url)
+
 proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
   # Firstly, try to find the dep in our solver cache.
   # The first list is guaranteed to be the main
@@ -354,8 +365,14 @@ proc handleRef*(
 
   deps &= handled
 
+proc initSolverCache*(): SolverCache {.inline.} =
+  var cache: SolverCache
+  cache.lists &= &lazilyFetchPackageList(DefaultPackageList)
+
+  ensureMove(cache)
+
 proc solveDependencies*(
-    project: var Project
+    project: Project
 ): tuple[deps: seq[Dependency], graph: SolvedGraph] =
   # Prime-up the cache.
   # For now, we'll only include
@@ -366,8 +383,7 @@ proc solveDependencies*(
   if refs.len < 1:
     return
 
-  var cache: SolverCache
-  cache.lists &= &lazilyFetchPackageList(DefaultPackageList)
+  let cache = initSolverCache()
 
   var dependencyVec: seq[Dependency]
   var newRefs: seq[PackageRef]
