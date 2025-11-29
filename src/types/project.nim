@@ -76,7 +76,7 @@ func getDependencies*(project: Project): seq[string] {.inline.} =
   for key, value in project.dependencies:
     var value = value
 
-    if value.len > 0 and value[0] notin {'>', '=', '<'}:
+    if value.len > 0 and value[0] notin {'>', '=', '<', '#'}:
       # If the package's version constraint doesn't begin
       # with a constraint symbol, automatically prefix it with `>=`
       value = ">= " & value
