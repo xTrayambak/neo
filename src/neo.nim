@@ -116,11 +116,13 @@ proc runPackageCommand(args: argparser.Input, useColors: bool) =
       project = project,
       directory = getCurrentDir() / "src",
       args = args,
-      opts = BuildOpts(targets: some(@[binaryName])),
+      opts = BuildOpts(installOutputs: false, targets: some(@[binaryName])),
     ):
       error "Failed to compile binary output <red>" & binaryName &
         "<reset>. Please check the error above."
       quit(QuitFailure)
+
+    discard execCmd("./" & binaryName)
   except build.BuildError as exc:
     error exc.msg
     quit(QuitFailure)

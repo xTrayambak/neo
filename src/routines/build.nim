@@ -124,9 +124,10 @@ proc buildBinaries*(
       else:
         displayMessage("<yellow>warning<reset>", "ignoring build failure")
 
-  displayMessage(
-    "<green>Installed<reset>",
-    $nBins & " binar" & $(if nBins == 1: "y" else: "ies") & " successfully.",
-  )
+  if opts.installOutputs:
+    displayMessage(
+      "<green>Installed<reset>",
+      $nBins & " binar" & $(if nBins == 1: "y" else: "ies") & " successfully.",
+    )
 
   return not failure
