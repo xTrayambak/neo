@@ -1,6 +1,6 @@
 # Package
 
-version = "0.1.5"
+version = "0.1.6"
 author = "xTrayambak"
 description = "A new package manager for Nim with an intelligible codebase"
 license = "BSD-3-Clause"
@@ -20,3 +20,4 @@ requires "leveldb >= 0.4.1"
 requires "pretty >= 0.2.0"
 requires "url >= 0.1.3"
 requires "parsetoml >= 0.7.2"
+requires "crunchy >= 0.1.0"
