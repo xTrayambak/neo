@@ -1,13 +1,13 @@
 ## Neo - the new package manager for Nim
 ## 
-## Copyright (C) Trayambak Rai (xtrayambak at disroot dot org)
+## Copyright (C) Trayambak Rai (xtrayambak@disroot.org)
 import std/[os, osproc, options, tables, strutils, times]
 import pkg/[semver, shakar, floof, results, url]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, compilation_options, package_lists]
 import
   ./routines/[
-    checksumming, initialize, package_lists, forge_aliases, state, dependencies,
+    build, checksumming, initialize, package_lists, forge_aliases, state, dependencies,
     neo_directory, locking,
   ],
   ./routines/nimble/primitiveparser
@@ -76,78 +76,16 @@ proc buildPackageCommand(args: argparser.Input, hasColorSupport: bool) {.noRetur
     error "Failed to load project: " & exc.msg
     quit(QuitFailure)
 
-  if project.package.binaries.len < 1:
-    error "This project has no compilable binaries."
-    quit(QuitFailure)
-
-  var toolchain = newToolchain(version = project.toolchain.version)
-
-  var extraFlags: string
-  for flag, value in args.flags:
-    extraFlags &= "--" & flag & ':' & value & ' '
-
-  if not hasColorSupport:
-    extraFlags &= "--colors:off "
-  else:
-    extraFlags &= "--colors:on "
-
-  for switch in args.switches:
-    extraFlags &= "--" & switch
-
-  var
-    deps: seq[Dependency]
-    graph: SolvedGraph
-
   try:
-    (deps, graph) = project.solveDependencies()
-  except CannotResolveDependencies as exc:
+    if not buildBinaries(
+      project = project, directory = directory, args = args, opts = BuildOpts()
+    ):
+      error "Failed to compile all binaries. Check the error above for more information."
+      quit(QuitFailure)
+  except build.BuildError as exc:
     error exc.msg
-    quit(QuitFailure)
-  except CloneFailed as exc:
-    error exc.msg
-    quit(QuitFailure)
-
-  var failure = false
-  for binFile in project.package.binaries:
-    displayMessage(
-      "<yellow>compiling<reset>",
-      "<green>" & binFile & "<reset> using the <blue>" &
-        project.package.backend.toHumanString() & "<reset> backend",
-    )
-    let stats = toolchain.compile(
-      project.package.backend,
-      directory / binFile & ".nim",
-      CompilationOptions(
-        outputFile: binFile,
-        extraFlags:
-          extraFlags & " --define:NimblePkgVersion=" & $project.package.version,
-        appendPaths: getDepPaths(graph),
-      ),
-    )
-
-    if stats.successful:
-      displayMessage(
-        "<green>" & binFile & "<reset>",
-        "was built successfully, with <green>" & $stats.unitsCompiled &
-          "<reset> unit(s) compiled.",
-      )
-    else:
-      displayMessage(
-        "<red>" & binFile & "<reset>",
-        "has failed to compile. Check the error above for more information.",
-      )
-      failure = true
-      break
-        # TODO: add a flag called `--ignore-build-failure` which doesn't cause the entire build process to stop after an error
-
-  if failure:
-    quit(QuitFailure)
 
 proc runPackageCommand(args: argparser.Input, useColors: bool) =
-  var
-    directory = "src"
-    firstArgumentUsed = false
-
   let sourceFile = getCurrentDir() / "neo.toml"
   let chosenBinary =
     if args.arguments.len > 0:
@@ -159,7 +97,7 @@ proc runPackageCommand(args: argparser.Input, useColors: bool) =
     error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
     quit(QuitFailure)
 
-  var project = loadProject(sourceFile)
+  let project = loadProject(sourceFile)
   let binaryName = block:
     if project.package.binaries.len > 1:
       if !chosenBinary:
@@ -173,64 +111,18 @@ proc runPackageCommand(args: argparser.Input, useColors: bool) =
     else:
       project.package.binaries[0]
 
-  var toolchain = newToolchain(project.toolchain.version)
-
-  var
-    deps: seq[Dependency]
-    graph: SolvedGraph
-
   try:
-    (deps, graph) = project.solveDependencies()
-  except CannotResolveDependencies as exc:
+    if not buildBinaries(
+      project = project,
+      directory = getCurrentDir() / "src",
+      args = args,
+      opts = BuildOpts(targets: some(@[binaryName])),
+    ):
+      error "Failed to compile binary output <red>" & binaryName &
+        "<reset>. Please check the error above."
+      quit(QuitFailure)
+  except build.BuildError as exc:
     error exc.msg
-    quit(QuitFailure)
-  except CloneFailed as exc:
-    error exc.msg
-    quit(QuitFailure)
-
-  displayMessage(
-    "<yellow>compiling<reset>",
-    "<green>" & binaryName & "<reset> using the <blue>" &
-      project.package.backend.toHumanString() & "<reset> backend",
-  )
-
-  var extraCompilerFlags: string
-  if not hasColorSupport:
-    extraCompilerFlags &= "--colors:off "
-  else:
-    extraCompilerFlags &= "--colors:on "
-
-  let stats = toolchain.compile(
-    project.package.backend,
-    directory / binaryName & ".nim",
-    CompilationOptions(
-      outputFile: binaryName,
-      extraFlags:
-        extraCompilerFlags & " --define:NimblePkgVersion=" & $project.package.version,
-      appendPaths: getDepPaths(graph),
-    ),
-  )
-  if stats.successful:
-    displayMessage(
-      "<green>" & binaryName & "<reset>",
-      "was built successfully, with <green>" & $stats.unitsCompiled &
-        "<reset> unit(s) compiled.",
-    )
-
-    var extraFlags: string
-    for flag, value in args.flags:
-      extraFlags &= "--" & flag & ':' & value
-
-    for switch in args.switches:
-      extraFlags &= "--" & switch
-
-    saveNeoState()
-    discard execCmd("./" & binaryName & ' ' & extraFlags)
-  else:
-    displayMessage(
-      "<red>" & binaryName & "<reset>",
-      "has failed to compile. Check the error above for more information.",
-    )
     quit(QuitFailure)
 
 proc searchPackageCommand(args: argparser.Input) =
@@ -294,86 +186,25 @@ proc installBinaryProject(
     graph: SolvedGraph,
     useColors: bool = false,
 ) =
-  if project.package.binaries.len < 1:
-    error "This project exposes no binary outputs!"
-    quit(QuitFailure)
-
-  let version = project.version
-  if !version:
-    error "Cannot parse the version of project <yellow>" & project.name &
-      "<reset>: <red>" & version.error() & "<reset>"
-    quit(QuitFailure)
-
-  let versionStr = $(&version)
-
   displayMessage(
     "<green>Installing<reset>",
-    "binaries for " & project.name & "@<blue>" & versionStr & "<reset>",
+    "binaries for " & project.name & "@<blue>" & $project.package.version & "<reset>",
   )
 
-  var toolchain = newToolchain(project.toolchain.version)
-
-  var fail = false
-  for binaryName in project.package.binaries:
-    displayMessage(
-      "<yellow>compiling<reset>",
-      "<green>" & binaryName & "<reset> using the <blue>" &
-        project.package.backend.toHumanString() & "<reset> backend",
-    )
-
-    var extraFlags: string
-    extraFlags &= "--define:release --define:speed "
-
-    if useColors:
-      extraFlags &= "--colors:on"
-    else:
-      extraFlags &= "--colors:off"
-
-    let stats = toolchain.compile(
-      project.package.backend,
-      directory / binaryName & ".nim",
-      CompilationOptions(
-        outputFile: getNeoDir() / "bin" / binaryName,
-        extraFlags:
-          extraFlags & " --define:NimblePkgVersion=" & $project.package.version,
-        appendPaths: getDepPaths(graph),
+  try:
+    if not buildBinaries(
+      project = project,
+      directory = directory,
+      args = args,
+      opts = BuildOpts(
+        installOutputs: true, solverOutput: some(SolverOutput(deps: deps, graph: graph))
       ),
-    )
-    if stats.successful:
-      displayMessage(
-        "<green>" & binaryName & "<reset>",
-        "was built successfully, with <green>" & $stats.unitsCompiled &
-          "<reset> unit(s) compiled.",
-      )
-
-      var extraFlags: string
-      for flag, value in args.flags:
-        extraFlags &= "--" & flag & ':' & value
-
-      for switch in args.switches:
-        extraFlags &= "--" & switch
-    else:
-      displayMessage(
-        "<red>" & binaryName & "<reset>",
-        "has failed to compile. Check the error above for more information.",
-      )
-      fail = true
-      break
-
-  if fail:
-    error "One or more binaries have failed to compile. Check the error(s) above for more information."
+    ):
+      error "Failed to compile binary outputs for installation. Please check the error above."
+      quit(QuitFailure)
+  except build.BuildError as exc:
+    error exc.msg
     quit(QuitFailure)
-
-  displayMessage(
-    "<green>Installed<reset>",
-    $project.package.binaries.len & " binar" &
-      (if project.package.binaries.len == 1: "y" else: "ies") & " successfully.",
-  )
-  displayMessage(
-    "<yellow>warning<reset>",
-    "Make sure to add " & (getNeoDir() / "bin") &
-      " to your <blue>PATH<reset> environment variable to run these binaries.",
-  )
 
 proc installLibraryProject(args: argparser.Input, project: Project, directory: string) =
   let version = project.version
