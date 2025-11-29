@@ -1,7 +1,7 @@
 ## Everything to do with lockfiles (`neo.lock`)
 ##
 ## Copyright (C) 2025 Trayambak Rai (xtrayambak@disroot.org)
-import std/[os, tables, json]
+import std/[os, osproc, options, strutils, tables, json]
 #!fmt: off
 import ../output,
        ../types/[lockfile, project],
@@ -9,8 +9,21 @@ import ../output,
 #!fmt: on
 import pkg/[url, shakar, semver, pretty]
 
+type
+  LockError* = object of CatchableError
+  CannotComputeCommitHash* = object of LockError
+
 proc lockfileExists*(dir: string): bool =
   fileExists(dir / "neo.lock")
+
+proc getCommitHash(name: string, version: string): Option[string] =
+  let (output, code) =
+    execCmdEx("git -C " & getDirectoryForPackage(name, version) & " rev-parse HEAD")
+
+  if code != 0:
+    return none(string)
+
+  some(output.strip())
 
 proc emitFlattenedDeps(project: Project, lock: var Lockfile, pathsBuffer: out string) =
   let (_, graph) = solveDependencies(project)
@@ -24,6 +37,12 @@ proc emitFlattenedDeps(project: Project, lock: var Lockfile, pathsBuffer: out st
 
     lockedPkg.checksum = computeChecksum(node.name, $node.version)
     lockedPkg.version = $node.version
+
+    let commitHash = getCommitHash(node.name, $node.version)
+    if !commitHash:
+      raise newException(CannotComputeCommitHash, node.name)
+
+    lockedPkg.commit = &commitHash
     lockedPkg.url = serialize(&getDownloadURL(cache, node))
 
     lock.packages[node.name] = ensureMove(lockedPkg)
@@ -76,6 +95,9 @@ when withDir(thisDir(), system.fileExists("neo.paths")):
     )
   except IOError, OSError:
     error "Cannot write files: " & getCurrentException().msg
+    return false
+  except CannotComputeCommitHash as exc:
+    error "Cannot compute commit hash of dependency <red>" & exc.msg & "<reset>!"
     return false
 
   return true
