@@ -89,10 +89,15 @@ proc buildBinaries*(
       project.package.backend,
       directory / binFile & ".nim",
       CompilationOptions(
-        outputFile: getNeoDir() / "bin",
-        extraFlags:
-          extraFlags & " --define:NimblePkgVersion=" & $project.package.version,
+        outputFile: (
+          if opts.installOutputs:
+            getNeoDir() / "bin" / binFile
+          else:
+            binFile
+        ),
+        extraFlags: extraFlags,
         appendPaths: getDepPaths(graph),
+        version: $project.package.version,
       ),
     )
 
