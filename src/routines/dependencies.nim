@@ -53,10 +53,28 @@ proc find(cache: SolverCache, package: string): Option[PackageListItem] {.inline
 
 proc getDirectoryForPackage*(name: string, version: string): string =
   let
+    parsedUrl = tryParseURL(name)
+    packagesDir = getNeoDir() / "packages"
     version = if version.len < 1: "any" else: version
-    dir = getNeoDir() / "packages" / name & '-' & version
 
-  dir
+  if !parsedUrl:
+    # Regular package name route (e.g: zippy, webby, etc.)
+    let dir = packagesDir / name & '-' & version
+
+    return dir
+
+  let url =
+    if isForgeAlias(&parsedUrl):
+      expandForgeUrl(&parsedUrl)
+    else:
+      serialize(&parsedUrl)
+
+  let state = getPackageUrlNames()
+  # TODO: We are currently assuming the package has already been downloaded,
+  # we should ideally ensure that it has been, so that the state above is
+  # guaranteed to have the mapping.
+
+  packagesDir / state[url] & '-' & version
 
 proc findDirectoryForPackage*(name: string): Option[string] =
   for kind, dir in walkDir(getNeoDir() / "packages"):

@@ -56,6 +56,9 @@ proc compile*(
   let nimPath = toolchain.findNimExe()
   let payload = &nimPath & ' ' & ($backend & ' ' & $options & ' ' & file)
 
+  when not defined(release):
+    echo payload
+
   let res = execCmdEx(payload)
   var output = res.output.splitLines()
 
