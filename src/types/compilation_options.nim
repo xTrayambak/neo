@@ -3,6 +3,7 @@ type
     outputFile*: string
     extraFlags*: string
     appendPaths*: seq[string]
+    version*: string
 
   CompilationStatistics* = object
     successful*: bool = false
@@ -13,4 +14,6 @@ func `$`*(opts: CompilationOptions): string =
   for path in opts.appendPaths:
     appendPaths &= "--path:" & path & ' '
 
-  "--out:" & opts.outputFile & ' ' & opts.extraFlags & move(appendPaths)
+  "--noNimblePath --define:NimblePkgVersion=\"" & opts.version &
+    "\" --define:NeoPkgVersion=\"" & opts.version & "\"" & " --out:" & opts.outputFile &
+    ' ' & opts.extraFlags & move(appendPaths)
