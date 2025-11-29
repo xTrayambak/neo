@@ -4,7 +4,7 @@
 ##
 ## Copyright (C) 2025 Trayambak Rai (xtrayambak at disroot dot org)
 import std/[os, options, strutils, tables, tempfiles]
-import pkg/[url, results, shakar, semver]
+import pkg/[url, results, shakar, semver, pretty]
 import ../types/[project, package_lists]
 import
   ../routines/[package_lists, forge_aliases, git, neo_directory, state],
@@ -22,6 +22,7 @@ type
   CloneFailed* = object of SolverError
   CannotInferPackageName* = object of SolverError
   PackageAlreadyDependency* = object of SolverError
+  InvalidCommitHash* = object of SolverError
 
   SolverCache = object
     lists*: seq[PackageList]
@@ -141,6 +142,32 @@ proc inferDestPackageName*(dir: string): string =
   let project = loadProject(neoFilePath)
   project.name
 
+proc checkoutPackageState*(pkg: PackageRef, dest: string) =
+  if pkg.constraint != VerConstraint.None:
+    let checkout = gitCheckout(dest, $pkg.version)
+    if !checkout:
+      # HACK: Here, we need to handle a quirk.
+      # Some packages like to tag their versions as 'v<version>'.
+      # Nimble seems to handle this fine.
+      # Examples include araq/libcurl. Why do they do this?
+      # I have no clue. We might as well account for their quirky behaviour.
+      let quirkyCheckout = gitCheckout(dest, 'v' & $pkg.version)
+
+      if !quirkyCheckout:
+        # If even that fails, we'll need to use the base version.
+        # There's nothing we can do :(
+        displayMessage(
+          "<yellow>warning<reset>",
+          "Using base version; cannot checkout to " & pkg.name & '@' & $pkg.version,
+        )
+  elif *pkg.hash:
+    if !gitCheckout(dest, &pkg.hash):
+      raise newException(
+        InvalidCommitHash,
+        "Cannot checkout to revision <red>" & &pkg.hash & "<reset> for package <blue>" &
+          pkg.name & "<reset>!",
+      )
+
 proc downloadPackageFromURL*(
     url: string | URL,
     dest: Option[string] = none(string),
@@ -165,24 +192,7 @@ proc downloadPackageFromURL*(
   of "git":
     let cloned = gitClone(url, dest)
 
-    if pkg.constraint != VerConstraint.None:
-      let checkout = gitCheckout(dest, $version)
-      if !checkout:
-        # HACK: Here, we need to handle a quirk.
-        # Some packages made by certain specimen
-        # like to tag their versions as 'v<version>'.
-        # Nimble seems to handle this fine.
-        # Examples include araq/libcurl. Why do they do this?
-        # I have no clue. We might as well account for their quirky behaviour.
-        let quirkyCheckout = gitCheckout(dest, 'v' & $version)
-
-        if !quirkyCheckout:
-          # If even that fails, we'll need to use the base version.
-          # There's nothing we can do :(
-          displayMessage(
-            "<yellow>warning<reset>",
-            "Using base version; cannot checkout to " & name & '@' & $version,
-          )
+    checkoutPackageState(pkg, dest)
 
     if !cloned:
       raise newException(
@@ -268,6 +278,8 @@ proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
       finalDest = some(downloadPackage(pkg, dep))
     else:
       finalDest = some(getDirectoryForPackage(dep.name, $dep.version))
+
+    checkoutPackageState(dep, &finalDest)
   else:
     # We don't know the package's name, so we need to defer
     # its resolution if it isn't in our known lists either.

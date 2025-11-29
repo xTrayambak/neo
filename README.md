@@ -24,10 +24,10 @@ Neo is currently a ~2.1K LoC project, and has the following features ready and w
 - [X] Forge aliases
 - [X] Dependency solver
 - [X] Proper dependency management
-- [X] Lockfiles
+- [X] Lockfiles (**partially**)
+- [X] Dependency hash pinning
 
 The following are pending tasks that will hopefully be completed soon:
-- [ ] Dependency hash pinning
 - [ ] Tasks
 - [ ] Hooks
 
@@ -39,8 +39,8 @@ $ neo build
 
 # Dependencies
 - libcURL
+- LevelDB
 - git
-- POSIX utilities
 
 # Usage
 ## Creating a project

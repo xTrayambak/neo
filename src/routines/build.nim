@@ -66,6 +66,9 @@ proc buildBinaries*(
     except CloneFailed as exc:
       error exc.msg
       return false
+    except InvalidCommitHash as exc:
+      error exc.msg
+      return false
   else:
     let output = &opts.solverOutput
     deps = output.deps
