@@ -251,6 +251,7 @@ proc getDownloadURL*(cache: SolverCache, dep: PackageRef): Option[URL] =
   else:
     some(&url)
 
+import pretty
 proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
   # Firstly, try to find the dep in our solver cache.
   # The first list is guaranteed to be the main

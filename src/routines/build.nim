@@ -8,7 +8,7 @@ import
   ../types/[backend, compilation_options, project, toolchain], ../[argparser, output]
 import ./[dependencies, neo_directory]
 import pkg/shakar
-
+import pretty
 type
   BuildError* = object of IOError
   NoBinaries* = object of BuildError

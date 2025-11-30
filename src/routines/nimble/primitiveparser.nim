@@ -20,11 +20,17 @@ func parseNimbleFile*(source: string): NimbleFileInfo =
 
     line[index + 1 ..< stop]
 
-  func extractStrVecValue(line: string): seq[string] {.inline.} =
+  func extractStrVecValue(
+      line: string, findArrDelims: bool = true
+  ): seq[string] {.inline.} =
     # Let index be the place where the first "@[" occurs.
     # Let stop be the place where the final closing-bracket (]) occurs.
-    var index = line.find("@[") + 2
-    let stop = line.rfind(']')
+    var index = (if findArrDelims: line.find("@[") else: 0) + 2
+    let stop =
+      if findArrDelims:
+        line.rfind(']')
+      else:
+        line.len
 
     # Optimization: We can count how many elements we're
     # going to parse up-ahead by counting the number
@@ -53,10 +59,10 @@ func parseNimbleFile*(source: string): NimbleFileInfo =
 
       inc index
 
-    debugecho "vec: " & $vec
     ensureMove(vec)
 
-  for line in source.splitLines():
+  let lines = source.splitLines()
+  for i, line in lines:
     if line.startsWith("version"):
       pkg.version = extractStrValue(line)
     elif line.startsWith("license"):
@@ -75,6 +81,31 @@ func parseNimbleFile*(source: string): NimbleFileInfo =
     elif line.startsWith("description"):
       pkg.description = extractStrValue(line)
     elif line.startsWith("requires"):
-      pkg.requires &= extractStrValue(line)
+      if not line.contains(','):
+        # Fast path: single-require
+        pkg.requires &= extractStrValue(line)
+      else:
+        # Slow path: multiple packages in one require,
+        # because for some reason `requires` is varargs (I swear this
+        # is extremely stupid)
+
+        # FIXME: Also this is brittle as hell and will probably break
+        var reqLines: seq[string]
+        for line in lines[i ..< lines.len]:
+          let splitted = line.split(',')
+          if splitted.len > 1:
+            for splittedLine in splitted:
+              let stripped = strip(splittedLine)
+              if stripped.len < 1:
+                continue
+
+              reqLines &= stripped
+
+            continue
+
+          break
+
+        for line in reqLines:
+          pkg.requires &= extractStrValue(line)
 
   ensureMove(pkg)
