@@ -23,7 +23,7 @@ func parseNimbleFile*(source: string): NimbleFileInfo =
   func extractStrVecValue(line: string): seq[string] {.inline.} =
     # Let index be the place where the first "@[" occurs.
     # Let stop be the place where the final closing-bracket (]) occurs.
-    var index = line.find("@[")
+    var index = line.find("@[") + 2
     let stop = line.rfind(']')
 
     # Optimization: We can count how many elements we're
@@ -31,18 +31,29 @@ func parseNimbleFile*(source: string): NimbleFileInfo =
     # of commas in this line.
     var vec = newSeqOfCap[string](line.count(','))
     var curr: string
+    var insideStr = false
 
     while index < stop:
       let c = line[index]
       case c
       of ',':
-        vec &= curr
-        curr.reset()
+        discard
+      of '"':
+        if insideStr:
+          vec &= curr
+          curr.reset()
+          insideStr = false
+        else:
+          insideStr = true
       else:
-        curr &= c
+        if insideStr:
+          curr &= c
+
+        discard "Not needed"
 
       inc index
 
+    debugecho "vec: " & $vec
     ensureMove(vec)
 
   for line in source.splitLines():
