@@ -25,6 +25,8 @@ type
     solverOutput*: Option[SolverOutput]
     installOutputs*: bool
 
+    release*: bool
+
 proc buildBinaries*(
     project: Project, directory: string, args: argparser.Input, opts: BuildOpts
 ): bool =
@@ -51,7 +53,10 @@ proc buildBinaries*(
     extraFlags &= "--colors:on "
 
   for switch in args.switches:
-    extraFlags &= "--" & switch
+    extraFlags &= "--" & switch & ' '
+
+  if opts.release:
+    extraFlags &= "--define:release "
 
   var
     deps: seq[Dependency]

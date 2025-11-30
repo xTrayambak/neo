@@ -78,7 +78,10 @@ proc buildPackageCommand(args: argparser.Input, hasColorSupport: bool) {.noRetur
 
   try:
     if not buildBinaries(
-      project = project, directory = directory, args = args, opts = BuildOpts()
+      project = project,
+      directory = directory,
+      args = args,
+      opts = BuildOpts(release: args.enabled("release")),
     ):
       error "Failed to compile all binaries. Check the error above for more information."
       quit(QuitFailure)
@@ -116,7 +119,11 @@ proc runPackageCommand(args: argparser.Input, useColors: bool) =
       project = project,
       directory = getCurrentDir() / "src",
       args = args,
-      opts = BuildOpts(installOutputs: false, targets: some(@[binaryName])),
+      opts = BuildOpts(
+        release: args.enabled("release"),
+        installOutputs: false,
+        targets: some(@[binaryName]),
+      ),
     ):
       error "Failed to compile binary output <red>" & binaryName &
         "<reset>. Please check the error above."
@@ -199,7 +206,9 @@ proc installBinaryProject(
       directory = directory,
       args = args,
       opts = BuildOpts(
-        installOutputs: true, solverOutput: some(SolverOutput(deps: deps, graph: graph))
+        release: true,
+        installOutputs: true,
+        solverOutput: some(SolverOutput(deps: deps, graph: graph)),
       ),
     ):
       error "Failed to compile binary outputs for installation. Please check the error above."
