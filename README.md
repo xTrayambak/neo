@@ -21,6 +21,7 @@ Neo is currently a ~2.1K LoC project, and has the following features ready and w
 - [X] `neo search` command
 - [X] `neo info` command
 - [X] `neo add` command
+- [X] `neo test` command
 - [X] Forge aliases
 - [X] Dependency solver
 - [X] Proper dependency management

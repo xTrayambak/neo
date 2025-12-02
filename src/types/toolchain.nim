@@ -15,6 +15,9 @@ proc findNimExe*(toolchain: var Toolchain): Option[string] {.sideEffect.} =
   # Try the Nim executable in the system path
   let nim = findExe("nim")
   if nim.len > 0:
+    if toolchain.version.len < 1:
+      return some(nim)
+
     # Run `nim -v`
     let
       output = execCmdEx(nim & " -v").output

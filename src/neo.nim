@@ -604,6 +604,60 @@ proc lockCommand(args: argparser.Input) =
   error "An error occurred while generating the lockfile. Please refer to the errors above."
   quit(QuitFailure)
 
+proc testCommand(args: argparser.Input) =
+  let dir = getCurrentDir()
+  let projectOpt = loadProjectInDir(dir)
+  if !projectOpt:
+    error(
+      "Cannot find project manifest (<red>neo.toml<reset>) in the working directory."
+    )
+    quit(QuitFailure)
+
+  let project = &projectOpt
+  # TODO: A `tests` directory option flag in the manifest
+  let testsDir = dir / "tests"
+
+  var testList: seq[string]
+  for kind, path in walkDir(testsDir):
+    #!fmt: off
+    if kind != pcFile or
+      not splitFile(path)
+        .name
+        .startsWith('t'): continue
+    #!fmt: on
+
+    testList &= path
+
+  if testList.len < 1:
+    displayMessage("<yellow>warning<reset>", "No test cases found!")
+    quit(QuitFailure)
+
+  var
+    deps: seq[Dependency]
+    graph: SolvedGraph
+
+  if buildBinaries(
+    project = project,
+    directory = newString(0),
+    args = args,
+    opts = BuildOpts(
+      targetKind: BuildTargetKind.Tests,
+      targets: some(testList),
+      ignoreBuildFailure: false,
+      installOutputs: false,
+      release: false,
+      testing: TestingOpts(runAndCheck: true),
+    ),
+  ):
+    displayMessage(
+      "<green>Testing<reset>",
+      "has succeeded, with all tests compiling and executing successfully.",
+    )
+    quit(QuitSuccess)
+  else:
+    error("One or more tests have failed, please check the errors above.")
+    quit(QuitFailure)
+
 proc showHelpCommand() {.noReturn, sideEffect.} =
   echo "Neo is a package manager for Nim"
   displayMessage(
@@ -624,6 +678,7 @@ Commands:
   add    [name / url / forge alias]  Add a package as a dependency to your current project.
   meta                               Show the build metadata for Neo.
   lock                               Generate a lockfile with all dependencies, transitive and direct pinned.
+  test                               Run all of the specified tests for this project.
 
 Options:
   --colorless, C                  Do not use ANSI-escape codes to color Neo's output. This makes Neo's output easier to parse.
@@ -664,6 +719,8 @@ proc main() {.inline.} =
     metaCommand()
   of "lock":
     lockCommand(args)
+  of "test":
+    testCommand(args)
   else:
     if args.command.len < 1:
       showHelpCommand()
