@@ -3,12 +3,12 @@
 ## build logic into one set of routines.
 ##
 ## Copyright (C) 2025 Trayambak Rai (xtrayambak@disroot.org)
-import std/[os, options, tables]
+import std/[os, osproc, options, tables]
 import
   ../types/[backend, compilation_options, project, toolchain], ../[argparser, output]
 import ./[dependencies, neo_directory]
 import pkg/shakar
-import pretty
+
 type
   BuildError* = object of IOError
   NoBinaries* = object of BuildError
@@ -18,6 +18,13 @@ type
     deps*: seq[Dependency]
     graph*: SolvedGraph
 
+  BuildTargetKind* {.pure, size: sizeof(uint8).} = enum
+    Binaries = 0
+    Tests = 1
+
+  TestingOpts* = object
+    runAndCheck*: bool
+
   BuildOpts* = object
     targets*: Option[seq[string]]
     ignoreBuildFailure*: bool
@@ -26,17 +33,21 @@ type
     installOutputs*: bool
 
     release*: bool
+    targetKind*: BuildTargetKind
+
+    testing*: TestingOpts
 
 proc buildBinaries*(
     project: Project, directory: string, args: argparser.Input, opts: BuildOpts
 ): bool =
-  if project.package.kind == ProjectKind.Library:
+  if opts.targetKind == BuildTargetKind.Binaries and
+      project.package.kind == ProjectKind.Library:
     raise newException(
       IllegalSetup,
       "A <blue>Library<reset> project cannot build binary outputs. Please switch your project to a <green>Hybrid<reset> project in <green>neo.toml<reset> to continue.",
     )
 
-  if project.package.binaries.len < 1:
+  if opts.targetKind == BuildTargetKind.Binaries and project.package.binaries.len < 1:
     raise newException(
       NoBinaries, "Project <red>" & project.name & "<reset> has no binary outputs."
     )
@@ -79,6 +90,12 @@ proc buildBinaries*(
     deps = output.deps
     graph = output.graph
 
+  if opts.targetKind == BuildTargetKind.Tests:
+    assert(
+      *opts.targets,
+      "BuildOpts::targets must be defined if tests are to be built (the build routines cannot figure out which tests to compile on their own!)",
+    )
+
   let buildList =
     if *opts.targets:
       &opts.targets
@@ -95,7 +112,7 @@ proc buildBinaries*(
     )
     let stats = toolchain.compile(
       project.package.backend,
-      directory / binFile & ".nim",
+      directory / binFile,
       CompilationOptions(
         outputFile: (
           if opts.installOutputs:
@@ -115,6 +132,17 @@ proc buildBinaries*(
         "was built successfully, with <green>" & $stats.unitsCompiled &
           "<reset> unit(s) compiled.",
       )
+
+      if opts.testing.runAndCheck:
+        let testName = splitPath(binFile).tail
+
+        displayMessage("<green>Testing<reset>", testName)
+        if execCmd(binFile.changeFileExt(newString(0))) != 0:
+          failure = true
+          displayMessage("<red>Failed<reset>", testName)
+          break # TODO: Add TestingOpts::ignoreFailure
+        else:
+          displayMessage("<green>Success<reset>", testName)
 
       inc nBins
     else:
