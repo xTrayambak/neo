@@ -632,10 +632,6 @@ proc testCommand(args: argparser.Input) =
     displayMessage("<yellow>warning<reset>", "No test cases found!")
     quit(QuitFailure)
 
-  var
-    deps: seq[Dependency]
-    graph: SolvedGraph
-
   if buildBinaries(
     project = project,
     directory = newString(0),
