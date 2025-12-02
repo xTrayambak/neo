@@ -1,0 +1,101 @@
+{
+  "version": 0,
+  "packages": {
+    "zippy": {
+      "version": "0.10.6",
+      "commit": "123cd593f513d584526f119e7ccb65a7baefa8fa",
+      "url": "https://github.com/guzba/zippy",
+      "checksum": "9bdc13932fc5bd139c3152665ab995c0c822ba52e26f2f10fcf0afd9d9b7ce9f"
+    },
+    "semver": {
+      "version": "1.2.3",
+      "commit": "ec7732a4810441a937fe3059494ba338090c4957",
+      "url": "https://github.com/euantorano/semver.nim",
+      "checksum": "a545f50e28daae629769500ad06a5a92ff5efa8d742474fde75af72ee625d32b"
+    },
+    "jsony": {
+      "version": "1.1.5",
+      "commit": "ea811bec7fa50f5abd3088ba94cda74285e93f18",
+      "url": "https://github.com/treeform/jsony",
+      "checksum": "2968c482264a12a8891afab29d3a8326982a067a1a6a4b320ea998be35fefb88"
+    },
+    "floof": {
+      "version": "1.0.0",
+      "commit": "7a5d2487acffab6063c0a44d2208b7f1d40d6a44",
+      "url": "https://github.com/arashi-software/floof",
+      "checksum": "c1ce564ec454e0dbe3c5cbdae28a410dda0180c2f4f53e3af134007c2ed1d975"
+    },
+    "url": {
+      "version": "0.1.3",
+      "commit": "e26f41cbaaf67b4053bbc506618fe522991fbaa4",
+      "url": "https://github.com/xTrayambak/url",
+      "checksum": "76a8d84d63517b38614a48cccf5470b8e23d26e49d06bc4c0cab86fb8f7d638b"
+    },
+    "nimsimd": {
+      "version": "1.3.2",
+      "commit": "3f6b2668ffb0867d0bf786a658b817763e611350",
+      "url": "https://github.com/guzba/nimsimd",
+      "checksum": "62da560ae7eb04d9021212d28e1f60c8553016927ee460e94eeb2e42e5851f94"
+    },
+    "shakar": {
+      "version": "0.1.3",
+      "commit": "48333bf20e39519929cbcfaa3b3af60858805f35",
+      "url": "https://github.com/ferus-web/shakar",
+      "checksum": "1df8638ccb9014f8afa02c73a9052fddf86a533aa4f6b5c1efc3b6be09296e37"
+    },
+    "noise": {
+      "version": "0.1.10",
+      "commit": "1062d35d38fcd4d8a3bcdee3003381e639786edf",
+      "url": "https://github.com/jangko/nim-noise",
+      "checksum": "393b3d16b53592247f91e16b31a2e0ec6f26982980135beaf97fc10fcada2ae0"
+    },
+    "results": {
+      "version": "0.5.1",
+      "commit": "df8113dda4c2d74d460a8fa98252b0b771bf1f27",
+      "url": "https://github.com/arnetheduck/nim-results",
+      "checksum": "2a92b07a1749ddfaabb8ccc19619887a24d17cdd2ff1532fbf052390082b5b79"
+    },
+    "curly": {
+      "version": "1.1.1",
+      "commit": "a0f42baacbc48f4e5924b18854c0df9dcc251466",
+      "url": "https://github.com/guzba/curly",
+      "checksum": "ad5bb9e4fbaa268a4af8c4afcb202b30aeea2bc66cb881d18fcf67708501065e"
+    },
+    "pretty": {
+      "version": "0.2.0",
+      "commit": "9e770046c5cdf23d395d6b21c4657345481b1c76",
+      "url": "https://github.com/treeform/pretty",
+      "checksum": "0b453e0a027ce39b01d380ff7643ac55160ba0508f4fa0f402a189ffad5ce92e"
+    },
+    "crunchy": {
+      "version": "0.1.11",
+      "commit": "98eb6526982bb8aae8eec6e8781f4539fa19e049",
+      "url": "https://github.com/guzba/crunchy",
+      "checksum": "bb57bc8e88d5ae923718cdc50aac3211c0ba80a8ba105de811d082606bea2334"
+    },
+    "libcurl": {
+      "version": "1.0.0",
+      "commit": "23f3d90e60d7a233b5eb27fb13e57fd198c73697",
+      "url": "https://github.com/Araq/libcurl",
+      "checksum": "bcd085f915f48cd6a5a68357454819fdc8400323fd6e655ff09c8ea097dc4bda"
+    },
+    "parsetoml": {
+      "version": "0.7.2",
+      "commit": "d297f5a81be2472905d367aa675dcbbca6e7a5d2",
+      "url": "https://github.com/NimParsers/parsetoml.git",
+      "checksum": "4c9b8636227e9e66b3ca4058e502f8697a48db8fb8be077ef63af2e84d8a7468"
+    },
+    "webby": {
+      "version": "0.1.7",
+      "commit": "5820b276bfa31d01b5895d59a4b292b47f6c7277",
+      "url": "https://github.com/treeform/webby/",
+      "checksum": "d3f9ea67d9562d6495d3be6052373e3422d70d0cdd3dd3c429655d1aac327897"
+    },
+    "leveldb": {
+      "version": "0.4.1",
+      "commit": "69f86fe38c71afb391a0334130e421df8099bc50",
+      "url": "https://github.com/zielmicha/leveldb.nim",
+      "checksum": "148ed51d55b42bd7756f95a1e1b828470d854f21e14c6d292ee6ab64cf7e3aef"
+    }
+  }
+}
