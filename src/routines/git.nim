@@ -1,6 +1,6 @@
 ## Everything to do with git.
 ## This module's routines act as wrappers over the Git CLI.
-import std/[os, osproc]
+import std/[os, osproc, strutils]
 import pkg/[results, url]
 
 type
@@ -52,6 +52,14 @@ proc gitCheckout*(dest: string, branch: string = "master"): Result[void, string]
     return ok()
 
   err(output)
+
+proc gitRevParse*(dir: string): Result[string, string] =
+  let (output, code) = execCmdEx(getGitPath() & " -C " & dir & " rev-parse HEAD")
+
+  if code != 0:
+    return err(output)
+
+  ok(output.strip())
 
 proc gitInit*(dir: string): bool =
   let git = getGitPath()

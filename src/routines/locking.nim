@@ -5,32 +5,39 @@ import std/[os, osproc, options, strutils, tables, json]
 #!fmt: off
 import ../output,
        ../types/[lockfile, project],
-       ./[checksumming, dependencies]
+       ./[checksumming, dependencies, git]
 #!fmt: on
-import pkg/[url, shakar, semver, pretty]
+import pkg/[jsony, url, results, shakar, semver, pretty]
 
 type
   LockError* = object of CatchableError
   CannotComputeCommitHash* = object of LockError
 
+  ValidationError* = object of LockError
+  CommitMismatch* = object of ValidationError
+  ChecksumMismatch* = object of ValidationError
+
 proc lockfileExists*(dir: string): bool =
   fileExists(dir / "neo.lock")
 
-proc getCommitHash(name: string, version: string): Option[string] =
-  let (output, code) =
-    execCmdEx("git -C " & getDirectoryForPackage(name, version) & " rev-parse HEAD")
+proc generateLockedDepPaths*(graph: SolvedGraph): string =
+  var paths = newStringOfCap(512)
+  paths &= "--noNimblePath\n"
 
-  if code != 0:
-    return none(string)
+  for path in getDepPaths(graph):
+    paths &= "\n--path:\"" & path & '"'
 
-  some(output.strip())
+  ensureMove(paths)
+
+proc generateLockedDepPaths*(project: Project): string {.inline.} =
+  generateLockedDepPaths(solveDependencies(project).graph)
+
+proc getCommitHash*(name: string, version: string): Result[string, string] =
+  gitRevParse(getDirectoryForPackage(name, version))
 
 proc emitFlattenedDeps(project: Project, lock: var Lockfile, pathsBuffer: out string) =
   let (_, graph) = solveDependencies(project)
   let cache = initSolverCache()
-
-  pathsBuffer = newStringOfCap(512)
-  pathsBuffer &= "--noNimblePath"
 
   for node in graph:
     var lockedPkg: LockedPackage
@@ -47,8 +54,72 @@ proc emitFlattenedDeps(project: Project, lock: var Lockfile, pathsBuffer: out st
 
     lock.packages[node.name] = ensureMove(lockedPkg)
 
-  for path in getDepPaths(graph):
-    pathsBuffer &= "\n--path:\"" & path & '"'
+  pathsBuffer = generateLockedDepPaths(graph)
+
+proc loadLockFile*(dir: string): Option[Lockfile] =
+  if not lockfileExists(dir):
+    return none(Lockfile)
+
+  try:
+    return some(fromJson(readFile(dir / "neo.lock"), Lockfile))
+  except jsony.JsonError:
+    return none(Lockfile)
+
+proc validateNodeIntegrity*(
+    cache: SolverCache, locked: LockedPackage, node: PackageRef
+) =
+  let dir = getDirectoryForPackage(node.name, $node.version)
+  if not dirExists(dir):
+    # The package is not installed, try installing it.
+    discard downloadPackageFromURL(
+      url = &getDownloadURL(cache, node), dest = some(dir), pkg = node
+    )
+
+  # First, check if the SHA256 checksum matches what the lockfile expects.
+  let checksum = computeChecksum(dir)
+
+  if checksum != locked.checksum:
+    raise newException(
+      ChecksumMismatch,
+      "failed to verify the integrity of <yellow>" & node.name & "<reset>@<blue>" &
+        $node.version & "<reset>\n" & "  <red>expected<reset>: " & locked.checksum &
+        "\n  <red>found<reset>: " & checksum,
+    )
+
+  let revision = gitRevParse(dir)
+  if !revision:
+    raise newException(
+      CannotComputeCommitHash,
+      "Failed to get Git revision of package <red>" & node.name & "<reset>: " &
+        revision.error(),
+    )
+
+  if &revision != locked.commit:
+    # If we're not on the correct commit, try to forcefully get to it.
+    if !gitCheckout(&revision):
+      # If even that fails, throw an error.
+      raise newException(
+        CommitMismatch,
+        "failed to check-out to the expected revision of <yellow>" & node.name &
+          "<reset>@<blue>" & $node.version & "<reset>\n" & "  <red>expected<reset>: " &
+          locked.commit & "\n  <red>stuck at<reset>: " & &revision,
+      )
+
+proc buildGraphFromLock*(lockfile: Lockfile): SolvedGraph =
+  var graph: SolvedGraph
+  let cache = initSolverCache()
+
+  for name, data in lockfile.packages:
+    let pkgRef = PackageRef(
+      name: name,
+      version: parseVersion(data.version),
+      hash: some(data.commit),
+      constraint: VerConstraint.None,
+    )
+    validateNodeIntegrity(cache, data, pkgRef)
+    graph &= pkgRef
+
+  ensureMove(graph)
 
 proc constructLockFileStruct(
     project: Project

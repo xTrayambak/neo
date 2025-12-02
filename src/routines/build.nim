@@ -6,7 +6,7 @@
 import std/[os, osproc, options, tables]
 import
   ../types/[backend, compilation_options, project, toolchain], ../[argparser, output]
-import ./[dependencies, neo_directory]
+import ./[dependencies, locking, neo_directory]
 import pkg/shakar
 
 type
@@ -73,6 +73,8 @@ proc buildBinaries*(
     deps: seq[Dependency]
     graph: SolvedGraph
 
+    appendPaths: seq[string]
+
   if !opts.solverOutput:
     try:
       (deps, graph) = project.solveDependencies()
@@ -102,6 +104,23 @@ proc buildBinaries*(
     else:
       project.package.binaries
 
+  let parentDirectory = parentDir(directory)
+  if lockfileExists(parentDirectory):
+    # If a lockfile exists:
+
+    # 1. Reconstruct the dependency graph using the lock.
+
+    try:
+      graph = buildGraphFromLock(&loadLockFile(parentDirectory))
+    except locking.LockError as exc:
+      raise newException(BuildError, exc.msg)
+
+    # 2. Regenerate `neo.paths` so the compiler knows
+    # what locked versions of dependencies it needs to pull in.
+    writeFile("neo.paths", generateLockedDepPaths(graph))
+  else:
+    appendPaths = getDepPaths(graph)
+
   var failure = false
   var nBins: uint = 0
   for binFile in buildList:
@@ -121,7 +140,7 @@ proc buildBinaries*(
             binFile
         ),
         extraFlags: extraFlags,
-        appendPaths: getDepPaths(graph),
+        appendPaths: appendPaths,
         version: $project.package.version,
       ),
     )

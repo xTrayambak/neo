@@ -24,7 +24,7 @@ type
   PackageAlreadyDependency* = object of SolverError
   InvalidCommitHash* = object of SolverError
 
-  SolverCache = object
+  SolverCache* = object
     lists*: seq[PackageList]
 
   Dependency* = ref object
