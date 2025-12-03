@@ -619,10 +619,11 @@ proc testCommand(args: argparser.Input) =
 
   var testList: seq[string]
   for kind, path in walkDir(testsDir):
+    let splittedFile = splitFile(path)
     #!fmt: off
     if kind != pcFile or
-      not splitFile(path)
-        .name
+      splittedFile.ext != ".nim" or
+      not splittedFile.name
         .startsWith('t'): continue
     #!fmt: on
 
