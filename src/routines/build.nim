@@ -3,7 +3,7 @@
 ## build logic into one set of routines.
 ##
 ## Copyright (C) 2025 Trayambak Rai (xtrayambak@disroot.org)
-import std/[os, osproc, options, strutils, tables]
+import std/[os, osproc, options, tables]
 import
   ../types/[backend, compilation_options, project, toolchain], ../[argparser, output]
 import ./[dependencies, locking, neo_directory]
@@ -129,8 +129,6 @@ proc buildBinaries*(
       "<green>" & binFile & "<reset> using the <blue>" &
         project.package.backend.toHumanString() & "<reset> backend",
     )
-    var binFile = binFile
-    binFile.removeSuffix(".nim")
 
     let stats = toolchain.compile(
       project.package.backend,
@@ -138,9 +136,9 @@ proc buildBinaries*(
       CompilationOptions(
         outputFile: (
           if opts.installOutputs:
-            getNeoDir() / "bin" / binFile
+            getNeoDir() / "bin" / binFile.changeFileExt(newString(0))
           else:
-            binFile
+            binFile.changeFileExt(newString(0))
         ),
         extraFlags: extraFlags,
         appendPaths: appendPaths,
