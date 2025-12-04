@@ -324,10 +324,11 @@ proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
   if neoFileExists:
     var project = loadProject(neoFilePath)
     var dependency = Dependency(pkgRef: dep)
+    dependency.project = project
+
     for childDep in dependency.project.getPackageRefs():
       dependency.deps &= handleDep(cache, childDep)
 
-    dependency.project = project
     return move(dependency)
   elif *nimbleFilePath:
     # If this package uses Nimble (very likely right now),
