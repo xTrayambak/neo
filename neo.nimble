@@ -1,6 +1,6 @@
 # Package
 
-version = "0.1.7"
+version = "0.1.8"
 author = "xTrayambak"
 description = "A new package manager for Nim with an intelligible codebase"
 license = "BSD-3-Clause"
