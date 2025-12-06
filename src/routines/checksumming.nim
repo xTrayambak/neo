@@ -3,7 +3,7 @@
 ## Copyright (C) 2025 Trayambak Rai (xtrayambak at disroot dot org)
 import std/[algorithm, os, strutils, sequtils]
 import pkg/crunchy/sha256
-import ./[dependencies]
+import ./[dependencies, state]
 
 proc computeChecksum*(directory: string): string =
   assert(
@@ -24,5 +24,5 @@ proc computeChecksum*(directory: string): string =
 
   toLowerAscii(toHex(ensureMove(res)))
 
-proc computeChecksum*(name: string, version: string): string =
-  computeChecksum(getDirectoryForPackage(name, version))
+proc computeChecksum*(state: State, name: string, version: string): string =
+  computeChecksum(getDirectoryForPackage(state, name, version))

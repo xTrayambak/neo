@@ -65,10 +65,10 @@ proc getCachedPackageList*(url: string): Option[PackageList] =
     except JsonError as exc:
       error "Failed to parse cached package index: " & exc.msg
 
-proc lazilyFetchPackageList*(url: string): Option[PackageList] =
+proc lazilyFetchPackageList*(state: State, url: string): Option[PackageList] =
   let
     currTime = epochTime()
-    lastSync = getLastIndexSyncTime()
+    lastSync = state.lastIndexSyncTime
 
   # Our current threshold is 4 hours (14400 seconds)
   # TODO: Make this threshold customizable.
@@ -78,7 +78,7 @@ proc lazilyFetchPackageList*(url: string): Option[PackageList] =
     if *cached:
       return cached
 
-  setLastIndexSyncTime(currTime)
+  state.lastIndexSyncTime = currTime
   fetchPackageList(url)
 
 proc fetchPackageLists*(urls: openArray[string]): seq[Option[PackageList]] =

@@ -12,20 +12,19 @@ Neo is a new package manager for the [Nim programming language](https://nim-lang
 
 # Roadmap
 Neo is currently a ~2.1K LoC project, and has the following features ready and working:
-- [X] Internal storage area (`~/.local/share/neo`)
-- [X] Package lists/indices (stored at `~/.local/share/neo/indices`)
-- [X] Internal state is stored as a LevelDB database (at `~/.local/share/neo/state`)
 - [X] `neo build` command
+- [X] `neo run`command
 - [X] `neo search` command
 - [X] `neo init` command
 - [X] `neo search` command
 - [X] `neo info` command
 - [X] `neo add` command
 - [X] `neo test` command
+- [X] `neo lock` command
 - [X] Forge aliases
 - [X] Dependency solver
 - [X] Proper dependency management
-- [X] Lockfiles (**partially**)
+- [X] Lockfiles
 - [X] Dependency hash pinning
 
 The following are pending tasks that will hopefully be completed soon:
@@ -40,7 +39,6 @@ $ neo build
 
 # Dependencies
 - libcURL
-- LevelDB
 - git
 
 # Usage

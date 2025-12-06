@@ -5,7 +5,7 @@ import std/[os, osproc, options, strutils, tables, json]
 #!fmt: off
 import ../output,
        ../types/[lockfile, project],
-       ./[checksumming, dependencies, git]
+       ./[checksumming, dependencies, git, state]
 #!fmt: on
 import pkg/[jsony, url, results, shakar, semver, pretty]
 
@@ -20,32 +20,36 @@ type
 proc lockfileExists*(dir: string): bool =
   fileExists(dir / "neo.lock")
 
-proc generateLockedDepPaths*(graph: SolvedGraph): string =
+proc generateLockedDepPaths*(state: State, graph: SolvedGraph): string =
   var paths = newStringOfCap(512)
   paths &= "--noNimblePath\n"
 
-  for path in getDepPaths(graph):
+  for path in getDepPaths(graph, state):
     paths &= "\n--path:\"" & path & '"'
 
   ensureMove(paths)
 
-proc generateLockedDepPaths*(project: Project): string {.inline.} =
-  generateLockedDepPaths(solveDependencies(project).graph)
+proc generateLockedDepPaths*(project: Project, state: State): string {.inline.} =
+  generateLockedDepPaths(state, solveDependencies(project, state).graph)
 
-proc getCommitHash*(name: string, version: string): Result[string, string] =
-  gitRevParse(getDirectoryForPackage(name, version))
+proc getCommitHash*(
+    name: string, version: string, state: State
+): Result[string, string] =
+  gitRevParse(getDirectoryForPackage(state, name, version))
 
-proc emitFlattenedDeps(project: Project, lock: var Lockfile, pathsBuffer: out string) =
-  let (_, graph) = solveDependencies(project)
-  let cache = initSolverCache()
+proc emitFlattenedDeps(
+    project: Project, lock: var Lockfile, pathsBuffer: out string, state: State
+) =
+  let (_, graph) = solveDependencies(project, state)
+  let cache = initSolverCache(state)
 
   for node in graph:
     var lockedPkg: LockedPackage
 
-    lockedPkg.checksum = computeChecksum(node.name, $node.version)
+    lockedPkg.checksum = computeChecksum(state, node.name, $node.version)
     lockedPkg.version = $node.version
 
-    let commitHash = getCommitHash(node.name, $node.version)
+    let commitHash = getCommitHash(node.name, $node.version, state)
     if !commitHash:
       raise newException(CannotComputeCommitHash, node.name)
 
@@ -54,7 +58,7 @@ proc emitFlattenedDeps(project: Project, lock: var Lockfile, pathsBuffer: out st
 
     lock.packages[node.name] = ensureMove(lockedPkg)
 
-  pathsBuffer = generateLockedDepPaths(graph)
+  pathsBuffer = generateLockedDepPaths(state, graph)
 
 proc loadLockFile*(dir: string): Option[Lockfile] =
   if not lockfileExists(dir):
@@ -66,13 +70,13 @@ proc loadLockFile*(dir: string): Option[Lockfile] =
     return none(Lockfile)
 
 proc validateNodeIntegrity*(
-    cache: SolverCache, locked: LockedPackage, node: PackageRef
+    cache: SolverCache, locked: LockedPackage, node: PackageRef, state: State
 ) =
-  let dir = getDirectoryForPackage(node.name, $node.version)
+  let dir = getDirectoryForPackage(state, node.name, $node.version)
   if not dirExists(dir):
     # The package is not installed, try installing it.
     discard downloadPackageFromURL(
-      url = &getDownloadURL(cache, node), dest = some(dir), pkg = node
+      url = &getDownloadURL(cache, node), dest = some(dir), pkg = node, state = state
     )
 
   # First, check if the SHA256 checksum matches what the lockfile expects.
@@ -105,9 +109,9 @@ proc validateNodeIntegrity*(
           locked.commit & "\n  <red>stuck at<reset>: " & &revision,
       )
 
-proc buildGraphFromLock*(lockfile: Lockfile): SolvedGraph =
+proc buildGraphFromLock*(lockfile: Lockfile, state: State): SolvedGraph =
   var graph: SolvedGraph
-  let cache = initSolverCache()
+  let cache = initSolverCache(state)
 
   for name, data in lockfile.packages:
     let pkgRef = PackageRef(
@@ -116,13 +120,13 @@ proc buildGraphFromLock*(lockfile: Lockfile): SolvedGraph =
       hash: some(data.commit),
       constraint: VerConstraint.None,
     )
-    validateNodeIntegrity(cache, data, pkgRef)
+    validateNodeIntegrity(cache, data, pkgRef, state)
     graph &= pkgRef
 
   ensureMove(graph)
 
 proc constructLockFileStruct(
-    project: Project
+    project: Project, state: State
 ): tuple[lockfile: Lockfile, pathsBuffer: string] =
   var
     lock: Lockfile
@@ -130,11 +134,11 @@ proc constructLockFileStruct(
 
   lock.version = 0'u32
 
-  emitFlattenedDeps(project, lock, pathsBuffer)
+  emitFlattenedDeps(project, lock, pathsBuffer, state)
 
   (lockfile: ensureMove(lock), pathsBuffer: ensureMove(pathsBuffer))
 
-proc generateLockFile*(dir: string, lockfilePath: string): bool =
+proc generateLockFile*(dir: string, lockfilePath: string, state: State): bool =
   let projectOpt = loadProjectInDir(dir)
   if !projectOpt:
     error "Cannot generate lockfile; no <yellow>neo.toml<reset> was found!"
@@ -145,7 +149,7 @@ proc generateLockFile*(dir: string, lockfilePath: string): bool =
     "<yellow>Locking<reset>", "dependencies for <green>" & project.name & "<reset>"
   )
 
-  let (lockfile, pathsBuffer) = constructLockFileStruct(project)
+  let (lockfile, pathsBuffer) = constructLockFileStruct(project, state)
   try:
     #!fmt: off
     writeFile(dir / lockfilePath, pretty(%* lockfile))

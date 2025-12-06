@@ -55,7 +55,9 @@ proc initializePackageCommand(args: argparser.Input) {.noReturn.} =
 
   quit(QuitSuccess)
 
-proc buildPackageCommand(args: argparser.Input, hasColorSupport: bool) {.noReturn.} =
+proc buildPackageCommand(
+    args: argparser.Input, hasColorSupport: bool, state: State
+) {.noReturn.} =
   var directory = "src"
   let sourceFile =
     if args.arguments.len > 0:
@@ -82,13 +84,14 @@ proc buildPackageCommand(args: argparser.Input, hasColorSupport: bool) {.noRetur
       directory = directory,
       args = args,
       opts = BuildOpts(release: args.enabled("release")),
+      state = state,
     ):
       error "Failed to compile all binaries. Check the error above for more information."
       quit(QuitFailure)
   except build.BuildError as exc:
     error exc.msg
 
-proc runPackageCommand(args: argparser.Input, useColors: bool) =
+proc runPackageCommand(args: argparser.Input, useColors: bool, state: State) =
   let sourceFile = getCurrentDir() / "neo.toml"
   let chosenBinary =
     if args.arguments.len > 0:
@@ -124,6 +127,7 @@ proc runPackageCommand(args: argparser.Input, useColors: bool) =
         installOutputs: false,
         targets: some(@[binaryName]),
       ),
+      state = state,
     ):
       error "Failed to compile binary output <red>" & binaryName &
         "<reset>. Please check the error above."
@@ -134,7 +138,7 @@ proc runPackageCommand(args: argparser.Input, useColors: bool) =
     error exc.msg
     quit(QuitFailure)
 
-proc searchPackageCommand(args: argparser.Input) =
+proc searchPackageCommand(args: argparser.Input, state: State) =
   if args.arguments.len < 1:
     displayMessage(
       "<red>error<reset>", "This command expects one argument. It was provided none."
@@ -142,7 +146,7 @@ proc searchPackageCommand(args: argparser.Input) =
     quit(1)
 
   let package = args.arguments[0]
-  let list = lazilyFetchPackageList(DefaultPackageList)
+  let list = lazilyFetchPackageList(state, DefaultPackageList)
 
   if !list:
     # TODO: better errors
@@ -194,6 +198,7 @@ proc installBinaryProject(
     deps: seq[Dependency],
     graph: SolvedGraph,
     useColors: bool = false,
+    state: State,
 ) =
   displayMessage(
     "<green>Installing<reset>",
@@ -210,6 +215,7 @@ proc installBinaryProject(
         installOutputs: true,
         solverOutput: some(SolverOutput(deps: deps, graph: graph)),
       ),
+      state = state,
     ):
       error "Failed to compile binary outputs for installation. Please check the error above."
       quit(QuitFailure)
@@ -217,7 +223,9 @@ proc installBinaryProject(
     error exc.msg
     quit(QuitFailure)
 
-proc installLibraryProject(args: argparser.Input, project: Project, directory: string) =
+proc installLibraryProject(
+    args: argparser.Input, project: Project, directory: string, state: State
+) =
   let version = project.version
   if !version:
     error "Cannot parse the version of project <yellow>" & project.name &
@@ -232,10 +240,11 @@ proc installLibraryProject(args: argparser.Input, project: Project, directory: s
   )
 
   copyDir(
-    directory / "src" / project.name, getDirectoryForPackage(project.name, versionStr)
+    directory / "src" / project.name,
+    getDirectoryForPackage(state, project.name, versionStr),
   )
 
-proc installPackageCommand(args: argparser.Input, useColors: bool) =
+proc installPackageCommand(args: argparser.Input, useColors: bool, state: State) =
   var
     directory = "src"
     firstArgumentUsed = false
@@ -258,7 +267,7 @@ proc installPackageCommand(args: argparser.Input, useColors: bool) =
     graph: SolvedGraph
 
   try:
-    (deps, graph) = project.solveDependencies()
+    (deps, graph) = project.solveDependencies(state)
   except CannotResolveDependencies as exc:
     error exc.msg
     quit(QuitFailure)
@@ -275,13 +284,18 @@ proc installPackageCommand(args: argparser.Input, useColors: bool) =
       deps = deps,
       graph = graph,
       useColors = useColors,
+      state = state,
     )
   of ProjectKind.Library:
-    installLibraryProject(args = args, project = project, directory = directory)
+    installLibraryProject(
+      args = args, project = project, directory = directory, state = state
+    )
   of ProjectKind.Hybrid:
     # Install the library components first, as the binary
     # portions might depend on them.
-    installLibraryProject(args = args, project = project, directory = directory)
+    installLibraryProject(
+      args = args, project = project, directory = directory, state = state
+    )
     installBinaryProject(
       args = args,
       directory = directory,
@@ -289,11 +303,12 @@ proc installPackageCommand(args: argparser.Input, useColors: bool) =
       deps = deps,
       graph = graph,
       useColors = useColors,
+      state = state,
     )
 
-proc syncIndicesCommand(args: argparser.Input) =
+proc syncIndicesCommand(args: argparser.Input, state: State) =
   discard fetchPackageList(DefaultPackageList)
-  setLastIndexSyncTime(epochTime())
+  state.lastIndexSyncTime = epochTime()
 
 proc showInfoLegacyCommand(path: string, package: PackageListItem) =
   ## Show the information of a legacy (Nimble-only) package.
@@ -323,7 +338,7 @@ proc showInfoLegacyCommand(path: string, package: PackageListItem) =
     discard
   echo colorTagSubs("<green>documentation:<reset> " & package.web)
 
-proc showInfoUrlArgument(url: URL) =
+proc showInfoUrlArgument(url: URL, state: State) =
   let url =
     if isForgeAlias(url):
       # If url is a forge alias, we need to expand it from an opaque
@@ -334,7 +349,7 @@ proc showInfoUrlArgument(url: URL) =
       serialize(url)
 
   try:
-    discard downloadPackageFromURL(url, pkg = PackageRef(name: url))
+    discard downloadPackageFromURL(url, pkg = PackageRef(name: url), state)
   except CloneFailed as err:
     error err.msg
     quit(QuitFailure)
@@ -342,7 +357,7 @@ proc showInfoUrlArgument(url: URL) =
   # `downloadPackageFromURL()` automatically infers the package's name
   # after it successfully downloads it, so we can get its proper name.
   let
-    pkgName = getPackageUrlNames()[url]
+    pkgName = state.packageUrlResolvedNames[url]
     pkgDir = &findDirectoryForPackage(pkgName)
 
     path = pkgDir / "neo.toml"
@@ -372,7 +387,7 @@ proc showInfoUrlArgument(url: URL) =
   echo colorTagSubs("<green>license:<reset> " & project.package.license)
   echo colorTagSubs("<green>backend:<reset> " & project.package.backend.toHumanString())
 
-proc showInfoCommand(args: argparser.Input) =
+proc showInfoCommand(args: argparser.Input, state: State) =
   # TODO: This should search all available lists once we have that working.
   if args.arguments.len > 1:
     error "`<blue>neo info<reset>` expects exactly one argument, got " &
@@ -381,11 +396,11 @@ proc showInfoCommand(args: argparser.Input) =
 
   case args.arguments.len
   of 1:
-    let list = &lazilyFetchPackageList(DefaultPackageList)
+    let list = &lazilyFetchPackageList(state, DefaultPackageList)
     if (let url = tryParseUrl(args.arguments[0]); *url):
       # TODO: Clean this up. There's no good way to reconcile
       # the `neo info <url>` and `neo info <name>` codepaths.
-      showInfoUrlArgument(&url)
+      showInfoUrlArgument(&url, state)
       return
 
     let package = list.find(args.arguments[0])
@@ -397,7 +412,7 @@ proc showInfoCommand(args: argparser.Input) =
 
     let pkg = &package
     try:
-      discard downloadPackage(pkg, PackageRef(name: args.arguments[0]))
+      discard downloadPackage(pkg, PackageRef(name: args.arguments[0]), state)
     except CloneFailed as err:
       error err.msg
       quit(QuitFailure)
@@ -469,7 +484,7 @@ proc showInfoCommand(args: argparser.Input) =
   else:
     unreachable
 
-proc addPackageCommand(args: argparser.Input) =
+proc addPackageCommand(args: argparser.Input, state: State) =
   if args.arguments.len < 1:
     error "`<red>neo add<reset>` expects atleast one argument, got none instead."
     quit(QuitFailure)
@@ -485,7 +500,7 @@ proc addPackageCommand(args: argparser.Input) =
     displayMessage("<green>Adding<reset>", package & " to dependencies")
 
     try:
-      let version = addDependency(project, package)
+      let version = addDependency(project, package, state)
       displayMessage(
         "<green>Added<reset>",
         package & '@' & "<blue>" & version & "<reset> to dependencies",
@@ -590,21 +605,21 @@ proc metaCommand() =
   echo "Compiled with Nim " & NimVersion
   echo "Copyright (C) 2025 Trayambak Rai"
 
-proc lockCommand(args: argparser.Input) =
+proc lockCommand(args: argparser.Input, state: State) =
   let lockfilePath =
     if (let flagArg = args.flag("lockfile"); *flagArg):
       &flagArg
     else:
       "neo.lock"
 
-  if generateLockFile(getCurrentDir(), lockfilePath):
+  if generateLockFile(getCurrentDir(), lockfilePath, state):
     displayMessage("<green>Generated<reset>", "lockfile for project successfully")
     quit(QuitSuccess)
 
   error "An error occurred while generating the lockfile. Please refer to the errors above."
   quit(QuitFailure)
 
-proc testCommand(args: argparser.Input) =
+proc testCommand(args: argparser.Input, state: State) =
   let dir = getCurrentDir()
   let projectOpt = loadProjectInDir(dir)
   if !projectOpt:
@@ -645,6 +660,7 @@ proc testCommand(args: argparser.Input) =
       release: false,
       testing: TestingOpts(runAndCheck: true),
     ),
+    state = state,
   ):
     displayMessage(
       "<green>Testing<reset>",
@@ -682,11 +698,15 @@ Options:
   """
 
 proc main() {.inline.} =
-  try:
-    initNeoState()
-  except LevelDbException:
-    error "Cannot open the Neo state."
-    error "<yellow>Tip<reset>: Another instance of Neo might be running."
+  let state: State =
+    try:
+      getNeoState()
+    except StateParseError:
+      error "Cannot open the Neo state."
+      error "<yellow>Tip<reset>: The state file seems to be broken or corrupted."
+      nil
+
+  if state == nil:
     quit(QuitFailure)
 
   let args = parseInput()
@@ -695,37 +715,35 @@ proc main() {.inline.} =
   of "init":
     initializePackageCommand(args)
   of "build":
-    buildPackageCommand(args, output.hasColorSupport)
+    buildPackageCommand(args, output.hasColorSupport, state)
   of "run":
-    runPackageCommand(args, output.hasColorSupport)
+    runPackageCommand(args, output.hasColorSupport, state)
   of "search":
-    searchPackageCommand(args)
+    searchPackageCommand(args, state)
   of "help":
     showHelpCommand()
   of "install":
-    installPackageCommand(args, output.hasColorSupport)
+    installPackageCommand(args, output.hasColorSupport, state)
   of "sync":
-    syncIndicesCommand(args)
+    syncIndicesCommand(args, state)
   of "info":
-    showInfoCommand(args)
+    showInfoCommand(args, state)
   of "add":
-    addPackageCommand(args)
+    addPackageCommand(args, state)
   of "migrate":
     migrateCommand(args)
   of "meta":
     metaCommand()
   of "lock":
-    lockCommand(args)
+    lockCommand(args, state)
   of "test":
-    testCommand(args)
+    testCommand(args, state)
   else:
     if args.command.len < 1:
       showHelpCommand()
     else:
       error "invalid command <red>`" & args.command & "`<reset>"
       quit(QuitFailure)
-
-  saveNeoState()
 
 when isMainModule:
   main()

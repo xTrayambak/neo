@@ -52,7 +52,7 @@ proc find(cache: SolverCache, package: string): Option[PackageListItem] {.inline
       if pkg.name == package:
         return some(pkg)
 
-proc getDirectoryForPackage*(name: string, version: string): string =
+proc getDirectoryForPackage*(state: State, name: string, version: string): string =
   let
     parsedUrl = tryParseURL(name)
     packagesDir = getNeoDir() / "packages"
@@ -70,12 +70,12 @@ proc getDirectoryForPackage*(name: string, version: string): string =
     else:
       serialize(&parsedUrl)
 
-  let state = getPackageUrlNames()
+  let mapping = state.packageUrlResolvedNames
   # TODO: We are currently assuming the package has already been downloaded,
   # we should ideally ensure that it has been, so that the state above is
   # guaranteed to have the mapping.
 
-  packagesDir / state[url] & '-' & version
+  packagesDir / mapping[url] & '-' & version
 
 proc findDirectoryForPackage*(name: string): Option[string] =
   for kind, dir in walkDir(getNeoDir() / "packages"):
@@ -87,14 +87,14 @@ proc findDirectoryForPackage*(name: string): Option[string] =
 
     return some(dir)
 
-proc isDepInstalled*(dep: PackageRef): bool =
-  dirExists(getDirectoryForPackage(dep.name, $dep.version))
+proc isDepInstalled*(state: State, dep: PackageRef): bool =
+  dirExists(getDirectoryForPackage(state, dep.name, $dep.version))
 
-proc getDepPaths*(graph: SolvedGraph): seq[string] =
+proc getDepPaths*(graph: SolvedGraph, state: State): seq[string] =
   var paths: seq[string]
 
   for pkgRef in graph:
-    let base = getDirectoryForPackage(pkgRef.name, $pkgRef.version)
+    let base = getDirectoryForPackage(state, pkgRef.name, $pkgRef.version)
 
     if dirExists(base / "src"):
       paths &= base / "src"
@@ -171,6 +171,7 @@ proc checkoutPackageState*(pkg: PackageRef, dest: string) =
 proc downloadPackageFromURL*(
     url: string | URL,
     dest: Option[string] = none(string),
+    state: State,
     meth: string = "git",
     pkg: PackageRef,
 ): string =
@@ -205,7 +206,7 @@ proc downloadPackageFromURL*(
       let name = inferDestPackageName(dest)
       extraName = some(name)
 
-      finalDest = getDirectoryForPackage(name, $pkg.version)
+      finalDest = getDirectoryForPackage(state, name, $pkg.version)
       if dirExists(finalDest):
         # If our inferred destination is occupied,
         # delete all of its contents.
@@ -213,7 +214,7 @@ proc downloadPackageFromURL*(
 
       moveDir(dest, finalDest)
 
-      addPackageUrlName(url, name)
+      addPackageUrlName(state, url, name)
 
     displayMessage(
       "<green>Downloaded<reset>",
@@ -229,16 +230,16 @@ proc downloadPackageFromURL*(
     unhandledDownloadMethod(meth)
 
 proc downloadPackage*(
-    entry: PackageListItem, pkg: PackageRef, ignoreCache: bool = false
+    entry: PackageListItem, pkg: PackageRef, state: State, ignoreCache: bool = false
 ): string =
   let
     meth = entry.`method`
-    dest = getDirectoryForPackage(pkg.name, $pkg.version)
+    dest = getDirectoryForPackage(state, pkg.name, $pkg.version)
 
   if dirExists(dest) and not ignoreCache:
     return
 
-  downloadPackageFromURL(entry.url, some(dest), meth, pkg)
+  downloadPackageFromURL(entry.url, some(dest), state, meth, pkg)
 
 proc getDownloadURL*(cache: SolverCache, dep: PackageRef): Option[URL] =
   let url = tryParseURL(dep.name)
@@ -251,8 +252,7 @@ proc getDownloadURL*(cache: SolverCache, dep: PackageRef): Option[URL] =
   else:
     some(&url)
 
-import pretty
-proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
+proc handleDep*(cache: SolverCache, dep: PackageRef, state: State): Dependency =
   # Firstly, try to find the dep in our solver cache.
   # The first list is guaranteed to be the main
   # Nimble package index.
@@ -275,10 +275,10 @@ proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
     # If the package is found, then we can clone it via Git
     let pkg = &package
 
-    if not isDepInstalled(dep):
-      finalDest = some(downloadPackage(pkg, dep))
+    if not isDepInstalled(state, dep):
+      finalDest = some(downloadPackage(pkg, dep, state))
     else:
-      finalDest = some(getDirectoryForPackage(dep.name, $dep.version))
+      finalDest = some(getDirectoryForPackage(state, dep.name, $dep.version))
 
     checkoutPackageState(dep, &finalDest)
   else:
@@ -287,7 +287,7 @@ proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
     #
     # This way, we don't need to redownload URL-based packages
     # again and again.
-    let list = getPackageUrlNames()
+    let list = state.packageUrlResolvedNames
 
     let
       urlObj = &url
@@ -298,11 +298,12 @@ proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
           $urlObj
 
     if urlString in list:
-      finalDest = some(getDirectoryForPackage(list[urlString], $dep.version))
+      finalDest = some(getDirectoryForPackage(state, list[urlString], $dep.version))
 
     if !finalDest or not dirExists(&finalDest):
-      finalDest =
-        some(downloadPackageFromURL(urlString, dest = none(string), pkg = dep))
+      finalDest = some(
+        downloadPackageFromURL(urlString, dest = none(string), state = state, pkg = dep)
+      )
 
   # Now, we'll load up a Neo project if it exists for that project.
   let
@@ -327,7 +328,7 @@ proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
     dependency.project = project
 
     for childDep in dependency.project.getPackageRefs():
-      dependency.deps &= handleDep(cache, childDep)
+      dependency.deps &= handleDep(cache, childDep, state = state)
 
     return move(dependency)
   elif *nimbleFilePath:
@@ -353,7 +354,7 @@ proc handleDep*(cache: SolverCache, dep: PackageRef): Dependency =
         else:
           parsed.get()
 
-      dependency.deps &= handleDep(cache, pref)
+      dependency.deps &= handleDep(cache, pref, state = state)
 
     dependency.project = project
     return move(dependency)
@@ -381,8 +382,9 @@ proc handleRef*(
     dep: PackageRef,
     newRefs: var seq[PackageRef],
     deps: var seq[Dependency],
+    state: State,
 ) =
-  let handled = handleDep(cache, dep)
+  let handled = handleDep(cache, dep, state = state)
   if handled == nil:
     return
 
@@ -393,18 +395,18 @@ proc handleRef*(
     newRefs &= child.pkgRef
     deps &= child
 
-    handleRef(cache, child.pkgRef, newRefs, deps)
+    handleRef(cache, child.pkgRef, newRefs, deps, state = state)
 
   deps &= handled
 
-proc initSolverCache*(): SolverCache {.inline.} =
+proc initSolverCache*(state: State): SolverCache {.inline.} =
   var cache: SolverCache
-  cache.lists &= &lazilyFetchPackageList(DefaultPackageList)
+  cache.lists &= &lazilyFetchPackageList(state, DefaultPackageList)
 
   ensureMove(cache)
 
 proc solveDependencies*(
-    project: Project
+    project: Project, state: State
 ): tuple[deps: seq[Dependency], graph: SolvedGraph] =
   # Prime-up the cache.
   # For now, we'll only include
@@ -415,7 +417,7 @@ proc solveDependencies*(
   if refs.len < 1:
     return
 
-  let cache = initSolverCache()
+  let cache = initSolverCache(state)
 
   var dependencyVec: seq[Dependency]
   var newRefs: seq[PackageRef]
@@ -429,7 +431,7 @@ proc solveDependencies*(
   # Now, with the fixed versions, we can go ahead and
   # download all our dependencies
   for pkgRef in refs:
-    handleRef(cache, pkgRef, newRefs, dependencyVec)
+    handleRef(cache, pkgRef, newRefs, dependencyVec, state = state)
 
   refs &= newRefs
   solveDependencies(refs)
@@ -452,7 +454,7 @@ proc addDependencyForgeAlias*(project: var Project, url: URL) =
   ## For self-hostable services, we just redirect to the main instance of that service.
   project.dependencies[$url] = ""
 
-proc addDependency*(project: var Project, package: string): string =
+proc addDependency*(project: var Project, package: string, state: State): string =
   let url =
     try:
       some(parseUrl(package))
@@ -474,9 +476,9 @@ proc addDependency*(project: var Project, package: string): string =
   if !url:
     # If `package` isn't a URL, we need to prime the solver cache
     # with all the package lists.
-    cache.lists &= &lazilyFetchPackageList(DefaultPackageList)
+    cache.lists &= &lazilyFetchPackageList(state, DefaultPackageList)
 
-  let dep = handleDep(cache, PackageRef(name: package))
+  let dep = handleDep(cache, PackageRef(name: package), state = state)
   let version = $dep.pkgRef.version
 
   if *url:
