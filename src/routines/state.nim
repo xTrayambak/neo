@@ -1,7 +1,7 @@
 ## Everything to do with Neo's internal state.
 ## This is stored in Neo's private directory as a LevelDB database.
-import std/[json, os, options, strutils, tables]
-import pkg/[shakar, jsony, url]
+import std/[json, os, options, tables]
+import pkg/[jsony, url]
 import ./[neo_directory, filelock]
 
 proc dumpHook(s: var string, fd: File) =
@@ -22,7 +22,9 @@ type
 
   State* = ref StateObj
 
-proc `=destroy`*(state: StateObj) {.raises: [UnlockError, IOError].} =
+proc `=destroy`*(
+    state: StateObj
+) {.raises: [UnlockError, IOError, KeyError, OSError].} =
   writeFile(getNeoDir() / "state.json", toJson(state))
   unlockFile(state.fd)
 

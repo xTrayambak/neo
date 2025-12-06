@@ -1,13 +1,13 @@
 ## Everything to do with lockfiles (`neo.lock`)
 ##
 ## Copyright (C) 2025 Trayambak Rai (xtrayambak@disroot.org)
-import std/[os, osproc, options, strutils, tables, json]
+import std/[os, options, tables, json]
 #!fmt: off
 import ../output,
        ../types/[lockfile, project],
        ./[checksumming, dependencies, git, state]
 #!fmt: on
-import pkg/[jsony, url, results, shakar, semver, pretty]
+import pkg/[jsony, url, results, shakar, semver]
 
 type
   LockError* = object of CatchableError

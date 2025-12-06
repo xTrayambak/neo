@@ -7,7 +7,7 @@
 when defined(unix):
   import std/posix
 
-  {.push importc, header: "<sys/file.h>".}
+  {.push importc, used, header: "<sys/file.h>".}
   proc flock(fd: int32, op: int32): int32
   let
     LOCK_SH: int32

@@ -54,7 +54,7 @@ proc askQuestion*[T](question: string, choices: openArray[T], default: uint): ui
   let index =
     try:
       parseUint(noise.getLine())
-    except ValueError as exc:
+    except ValueError:
       error "invalid answer; defaulting to choice " & $(default + 1)
       default
 

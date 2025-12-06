@@ -4,12 +4,10 @@
 import std/[os, osproc, options, tables, strutils, times]
 import pkg/[semver, shakar, floof, results, url]
 import ./[argparser, output]
-import ./types/[project, toolchain, backend, compilation_options, package_lists]
+import ./types/[project, toolchain, backend, package_lists]
 import
-  ./routines/[
-    build, checksumming, initialize, package_lists, forge_aliases, state, dependencies,
-    neo_directory, locking,
-  ],
+  ./routines/
+    [build, initialize, package_lists, forge_aliases, state, dependencies, locking],
   ./routines/nimble/primitiveparser
 
 const

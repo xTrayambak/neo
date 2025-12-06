@@ -4,7 +4,7 @@
 ##
 ## Copyright (C) 2025 Trayambak Rai (xtrayambak at disroot dot org)
 import std/[os, options, strutils, tables, tempfiles]
-import pkg/[url, results, shakar, semver, pretty]
+import pkg/[url, results, shakar, semver]
 import ../types/[project, package_lists]
 import
   ../routines/[package_lists, forge_aliases, git, neo_directory, state],
@@ -339,7 +339,7 @@ proc handleDep*(cache: SolverCache, dep: PackageRef, state: State): Dependency =
     var dependency = Dependency(pkgRef: dep)
     try:
       dependency.pkgRef.version = parseVersion(info.version)
-    except semver.ParseError as exc:
+    except semver.ParseError:
       displayMessage(
         "<yellow>warning<reset>",
         "Cannot parse package's version: <red>" & info.version & "<reset>",
