@@ -3,7 +3,7 @@
 ## dependency conflicts. The highest version of a dependency is always chosen.
 ##
 ## Copyright (C) 2025 Trayambak Rai (xtrayambak at disroot dot org)
-import std/[os, options, strutils, tables, tempfiles]
+import std/[algorithm, os, options, strutils, tables, tempfiles]
 import pkg/[url, results, shakar, semver]
 import ../types/[project, package_lists]
 import
@@ -192,7 +192,6 @@ proc downloadPackageFromURL*(
   case meth
   of "git":
     let cloned = gitClone(url, dest)
-
     checkoutPackageState(pkg, dest)
 
     if !cloned:
@@ -490,3 +489,81 @@ proc addDependency*(project: var Project, package: string, state: State): string
     project.dependencies[package] = ">= " & version
 
   version
+
+proc computePotentialUpdateCandidate*(
+    current: semver.Version, candidates: seq[semver.Version]
+): Option[semver.Version] =
+  var prunedCandidates = newSeqOfCap[semver.Version](candidates.len)
+
+  for candidate in candidates:
+    if candidate < current:
+      # If the candidate is older than the current version, it is a no-go.
+      continue
+
+    if candidate == current:
+      # If the candidates are equal, they can't compete.
+      continue
+
+    if candidate.major != current.major:
+      # If the majors are different, it's a no-go.
+      continue
+
+    prunedCandidates &= candidate
+
+  if prunedCandidates.len < 1:
+    # We have no viable update candidates.
+    return none(semver.Version)
+
+  some(sorted(prunedCandidates, order = SortOrder.Descending)[0])
+
+proc updateGraphIfPossible*(
+    graph: var SolvedGraph, project: Project, cache: SolverCache, state: State
+) =
+  for i, node in graph:
+    let currVersion = node.version
+    let versionsAvailableOpt =
+      gitListTags(getDirectoryForPackage(state, node.name, $currVersion))
+
+    if !versionsAvailableOpt:
+      displayMessage(
+        "<yellow>warning<reset>:",
+        "Cannot check available versions for <red>" & node.name &
+          "<reset>, no attempts will be made to check for updates.",
+      )
+      continue
+
+    let versionsAvailable = &versionsAvailableOpt
+
+    var fullRange = newSeqOfCap[semver.Version](versionsAvailable.len)
+    for version in versionsAvailable:
+      try:
+        fullRange &= parseVersion(strip(version, chars = {'v'}))
+      except semver.ParseError:
+        displayMessage(
+          "<yellow>warning<reset>:",
+          "Cannot parse version <red>" & version & "<reset> for package <blue>" &
+            node.name & "<reset>; version will not be a viable candidate.",
+        )
+
+    let winningCandidate =
+      computePotentialUpdateCandidate(currVersion, ensureMove(fullRange))
+
+    if *winningCandidate:
+      when not defined(release):
+        debugEcho(node.name & ": " & $currversion & " -> " & $(&winningCandidate))
+      graph[i].version = &winningCandidate
+    else:
+      when not defined(release):
+        debugEcho(node.name & '@' & $currversion & " is at latest viable version")
+
+  # Now, we need to run the dependency solver globally so we can figure out the final result, that still respects other packages' constraints.
+  solveDependencies(graph)
+
+  # These two will go unused
+  var dependencyVec: seq[Dependency]
+  var newRefs: seq[PackageRef]
+
+  # Now, with the fixed versions, we can go ahead and
+  # download all our dependencies
+  for pkgRef in graph:
+    handleRef(cache, pkgRef, newRefs, dependencyVec, state = state)

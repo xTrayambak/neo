@@ -37,11 +37,10 @@ proc getCommitHash*(
 ): Result[string, string] =
   gitRevParse(getDirectoryForPackage(state, name, version))
 
-proc emitFlattenedDeps(
-    project: Project, lock: var Lockfile, pathsBuffer: out string, state: State
-) =
-  let (_, graph) = solveDependencies(project, state)
-  let cache = initSolverCache(state)
+proc buildLockedPackagesFromGraph*(
+    graph: SolvedGraph, cache: SolverCache, state: State
+): Table[string, LockedPackage] =
+  var packages: Table[string, LockedPackage]
 
   for node in graph:
     var lockedPkg: LockedPackage
@@ -56,8 +55,19 @@ proc emitFlattenedDeps(
     lockedPkg.commit = &commitHash
     lockedPkg.url = serialize(&getDownloadURL(cache, node))
 
-    lock.packages[node.name] = ensureMove(lockedPkg)
+    packages[node.name] = ensureMove(lockedPkg)
 
+  ensureMove(packages)
+
+proc emitFlattenedDeps(
+    project: Project,
+    lock: var Lockfile,
+    pathsBuffer: out string,
+    graph: SolvedGraph,
+    cache: SolverCache,
+    state: State,
+) {.inline.} =
+  lock.packages = buildLockedPackagesFromGraph(graph, cache, state)
   pathsBuffer = generateLockedDepPaths(state, graph)
 
 proc loadLockFile*(dir: string): Option[Lockfile] =
@@ -118,7 +128,7 @@ proc buildGraphFromLock*(lockfile: Lockfile, state: State): SolvedGraph =
       name: name,
       version: parseVersion(data.version),
       hash: some(data.commit),
-      constraint: VerConstraint.None,
+      constraint: VerConstraint.Equal,
     )
     validateNodeIntegrity(cache, data, pkgRef, state)
     graph &= pkgRef
@@ -134,9 +144,15 @@ proc constructLockFileStruct(
 
   lock.version = 0'u32
 
-  emitFlattenedDeps(project, lock, pathsBuffer, state)
+  let (_, graph) = solveDependencies(project, state)
+  let cache = initSolverCache(state)
+
+  emitFlattenedDeps(project, lock, pathsBuffer, graph, cache, state)
 
   (lockfile: ensureMove(lock), pathsBuffer: ensureMove(pathsBuffer))
+
+proc emitLockfile*(lockfile: Lockfile, path: string) {.inline.} =
+  writeFile(path, pretty(%*lockfile))
 
 proc generateLockFile*(dir: string, lockfilePath: string, state: State): bool =
   let projectOpt = loadProjectInDir(dir)
@@ -151,9 +167,7 @@ proc generateLockFile*(dir: string, lockfilePath: string, state: State): bool =
 
   let (lockfile, pathsBuffer) = constructLockFileStruct(project, state)
   try:
-    #!fmt: off
-    writeFile(dir / lockfilePath, pretty(%* lockfile))
-    #!fmt: on
+    emitLockfile(lockfile, dir / lockfilePath)
 
     writeFile(dir / "neo.paths", pathsBuffer)
     writeFile(

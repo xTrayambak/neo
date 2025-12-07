@@ -26,7 +26,8 @@ proc `=destroy`*(
     state: StateObj
 ) {.raises: [UnlockError, IOError, KeyError, OSError].} =
   writeFile(getNeoDir() / "state.json", toJson(state))
-  unlockFile(state.fd)
+  if state.fd != nil:
+    unlockFile(state.fd)
 
 proc getNeoState*(): State =
   let dir = getNeoDir()
