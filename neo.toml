@@ -1,7 +1,7 @@
 [package]
 name = "neo"
 description = "A new package manager for Nim with an intelligible codebase"
-version = "0.1.8"
+version = "0.1.9"
 license = "BSD-3-Clause"
 kind = "Binary"
 backend = "C"
