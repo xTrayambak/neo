@@ -1,6 +1,6 @@
 ## Everything to do with git.
 ## This module's routines act as wrappers over the Git CLI.
-import std/[os, osproc, strutils]
+import std/[os, osproc, sequtils, strutils]
 import pkg/[results, url]
 
 type
@@ -22,14 +22,17 @@ proc gitClone*(
   if dirExists(dest):
     removeDir(dest)
 
-  let
-    payload =
-      git & " clone " & $url & ' ' & dest & (
-        if branch.len > 0:
-          " --branch " & branch.quoteShell
-        else: newString(0)
-      )
-    (output, code) = execCmdEx(payload)
+  let payload =
+    git & " clone " & $url & ' ' & dest & (
+      if branch.len > 0:
+        " --branch " & branch.quoteShell
+      else: newString(0)
+    )
+
+  when not defined(release):
+    debugEcho(payload)
+
+  let (output, code) = execCmdEx(payload)
 
   # Go through each path in the destination and remove
   # the executable (X) bit from every single file, if found.
@@ -60,6 +63,17 @@ proc gitRevParse*(dir: string): Result[string, string] =
     return err(output)
 
   ok(output.strip())
+
+proc gitSyncTags*(dir: string): bool =
+  execCmd(getGitPath() & " -C " & dir & " fetch --all --tags") == 0
+
+proc gitListTags*(dir: string): Result[seq[string], string] =
+  let (output, code) = execCmdEx(getGitPath() & " -C " & dir & " tag")
+
+  if code != 0:
+    return err(output)
+
+  ok(output.split('\n').filterIt(it.len > 0))
 
 proc gitInit*(dir: string): bool =
   let git = getGitPath()
