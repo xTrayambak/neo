@@ -669,6 +669,43 @@ proc testCommand(args: argparser.Input, state: State) =
     error("One or more tests have failed, please check the errors above.")
     quit(QuitFailure)
 
+proc updateCommand(args: argparser.Input, state: State) =
+  let dir = getCurrentDir()
+  let projectOpt = loadProjectInDir(dir)
+  if !projectOpt:
+    error(
+      "Cannot find project manifest (<red>neo.toml<reset>) in the working directory."
+    )
+    quit(QuitFailure)
+
+  let lockfileOpt = loadLockFile(dir)
+  if !lockfileOpt:
+    error("Cannot find lockfile (<red>neo.lock<reset>) in the working directory.")
+    quit(QuitFailure)
+
+  let project = &projectOpt
+  var lockfile = &lockfileOpt
+
+  let cache = initSolverCache(state)
+
+  var graph: SolvedGraph
+
+  try:
+    graph = buildGraphFromLock(lockfile, state)
+  except locking.LockError as exc:
+    error exc.msg
+    quit(QuitFailure)
+
+  updateGraphIfPossible(graph, project, cache, state)
+
+  lockfile.packages = buildLockedPackagesFromGraph(ensureMove(graph), cache, state)
+  emitLockfile(ensureMove(lockfile), dir / "neo.lock")
+
+  displayMessage(
+    "<green>Updated<reset>",
+    "all dependencies with new potential candidates successfully.",
+  )
+
 proc showHelpCommand() {.noReturn, sideEffect.} =
   echo "Neo is a package manager for Nim"
   displayMessage(
@@ -690,6 +727,7 @@ Commands:
   meta                               Show the build metadata for Neo.
   lock                               Generate a lockfile with all dependencies, transitive and direct pinned.
   test                               Run all of the specified tests for this project.
+  update                             Update dependencies listed in neo.lock
 
 Options:
   --colorless, C                  Do not use ANSI-escape codes to color Neo's output. This makes Neo's output easier to parse.
@@ -736,6 +774,8 @@ proc main() {.inline.} =
     lockCommand(args, state)
   of "test":
     testCommand(args, state)
+  of "update":
+    updateCommand(args, state)
   else:
     if args.command.len < 1:
       showHelpCommand()
