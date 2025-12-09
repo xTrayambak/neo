@@ -472,10 +472,9 @@ proc addDependency*(project: var Project, package: string, state: State): string
   # (e.g `neo add url@0.1.3`)
   var cache: SolverCache
 
-  if !url:
-    # If `package` isn't a URL, we need to prime the solver cache
-    # with all the package lists.
-    cache.lists &= &lazilyFetchPackageList(state, DefaultPackageList)
+  # If `package` isn't a URL, we need to prime the solver cache
+  # with all the package lists.
+  cache.lists &= &lazilyFetchPackageList(state, DefaultPackageList)
 
   let dep = handleDep(cache, PackageRef(name: package), state = state)
   let version = $dep.pkgRef.version
