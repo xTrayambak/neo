@@ -12,9 +12,14 @@ proc computeChecksum*(directory: string): string =
   )
 
   var buffer = newStringOfCap(2048)
-  let files = sorted(toSeq(walkDirRec(directory)))
+  let files = sorted(toSeq(walkDirRec(directory, skipSpecial = true)))
 
   for file in files:
+    if relativePath(splitFile(file).dir, directory).startsWith('.'):
+      # Don't include files matching patterns like .git/*
+      # They are not important for reproducability.
+      continue
+
     buffer &= readFile(file)
 
   let checksum = sha256(ensureMove(buffer))
