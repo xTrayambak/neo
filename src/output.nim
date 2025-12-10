@@ -4,7 +4,11 @@
 import std/[strutils, posix]
 import pkg/[noise, semver]
 
-var hasColorSupport* {.global.} = isatty(stdout)
+var hasColorSupport* {.global.} =
+  when defined(unix):
+    isatty(stdout)
+  else:
+    true
 
 const
   ColorTable = {
