@@ -125,6 +125,9 @@ proc buildBinaries*(
   else:
     appendPaths = getDepPaths(graph, state)
 
+  if opts.testing.runAndCheck:
+    saveState(state[])
+
   var failure = false
   var nBins: uint = 0
   for binFile in buildList:

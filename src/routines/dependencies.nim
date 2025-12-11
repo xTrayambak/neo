@@ -212,7 +212,6 @@ proc downloadPackageFromURL*(
         removeDir(finalDest)
 
       moveDir(dest, finalDest)
-
       addPackageUrlName(state, url, name)
 
     displayMessage(

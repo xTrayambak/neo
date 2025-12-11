@@ -22,12 +22,15 @@ type
 
   State* = ref StateObj
 
-proc `=destroy`*(
-    state: StateObj
-) {.raises: [UnlockError, IOError, KeyError, OSError].} =
+proc saveState*(state: StateObj) =
   writeFile(getNeoDir() / "state.json", toJson(state))
   if state.fd != nil:
     unlockFile(state.fd)
+
+proc `=destroy`*(
+    state: StateObj
+) {.raises: [UnlockError, IOError, KeyError, OSError].} =
+  saveState(state)
 
 proc getNeoState*(): State =
   let dir = getNeoDir()
