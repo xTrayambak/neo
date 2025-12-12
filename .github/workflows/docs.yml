@@ -25,5 +25,4 @@ jobs:
 
       - name: Build and deploy
         run: |
-          sed -i 's/\\//g' docs/INDEX.md
           mkdocs gh-deploy --force --config-file mkdocs.yml
