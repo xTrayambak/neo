@@ -10,9 +10,6 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Install libraries
-      run: sudo apt-get update && sudo apt-get install -y libleveldb-dev
-
     - name: Install Nim
       uses: iffy/install-nim@v5
     - name: Install dependencies
