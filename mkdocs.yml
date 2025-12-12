@@ -1,0 +1,18 @@
+site_name: Neo
+site_url: https://neo.xtrayambak.xyz
+docs_dir: docs/
+
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+
+repo_name: xTrayambak/neo
+repo_url: https://github.com/xTrayambak/neo
+copyright: Copyright &copy; 2025 Trayambak Rai
+
+use_directory_urls: true
+
+nav:
+  - Index: INDEX.md
+  - Build Instructions: BUILDING.md
