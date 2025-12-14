@@ -1,18 +1,29 @@
 ## Everything to do with git.
 ## This module's routines act as wrappers over the Git CLI.
-import std/[os, osproc, sequtils, strutils]
-import pkg/[results, url]
+import std/[os, osproc, options, sequtils, strutils]
+import pkg/[results, shakar, url]
 
 type
   GitError* = object of OSError
   GitNotInstalled* = object of GitError
 
+var cachedGitPath* {.threadvar, global.}: Option[string]
+
 proc getGitPath*(): string =
+  if likely(*cachedGitPath):
+    # Fast-path: If we cached the path to the Git binary earlier,
+    # we might as well use it. `findExe()` makes a boat load of syscalls,
+    # which is.... not good to say the least
+    return &cachedGitPath
+
+  # Slow-path: If we haven't cached the path to the Git binary,
+  # we must find it (assuming it exists)
   let path = findExe("git")
 
   if path.len < 1:
     raise newException(GitNotInstalled, "Git was not found in the PATH")
 
+  cachedGitPath = some(path)
   path
 
 proc gitClone*(
