@@ -1,4 +1,4 @@
-import std/[os, strutils, tables, options]
+import std/[os, strutils, sequtils, tables, options]
 import pkg/[parsetoml, results, semver, shakar, url]
 import ./[toolchain, backend]
 
@@ -54,10 +54,18 @@ type
     backend*: Backend
     binaries*: seq[string] = @[]
 
+  CPlatformInfo* = object
+    link*: seq[string]
+    incl*: seq[string]
+
+  PlatformInfo* = object
+    c*: Option[CPlatformInfo]
+
   Project* = object
     package*: ProjectPackageInfo
     toolchain*: Toolchain
     dependencies*: Table[string, string]
+    platforms*: PlatformInfo
 
 func `$`*(constraint: VerConstraint): string {.raises: [], inline.} =
   case constraint
@@ -314,6 +322,26 @@ func readProjectKind*(data: string): ProjectKind =
   else:
     raise newException(ValueError, "Invalid project kind: " & data)
 
+proc readPlatformsData(project: var Project, data: TomlValueRef) =
+  if "native" in data:
+    let cPlatData = data["native"]
+
+    var cPlatformInfo: CPlatformInfo
+    cPlatformInfo.link = (
+      if "link" in cPlatData:
+        cPlatData["link"].getElems().mapIt(it.getStr())
+      else:
+        newSeq[string](0)
+    )
+    cPlatformInfo.incl = (
+      if "include" in cPlatData:
+        cPlatData["include"].getElems().mapIt(it.getStr())
+      else:
+        newSeq[string](0)
+    )
+
+    project.platforms.c = some(ensureMove(cPlatformInfo))
+
 proc loadProject*(file: string): Project {.sideEffect.} =
   let
     data = parseString(readFile(file))
@@ -343,6 +371,9 @@ proc loadProject*(file: string): Project {.sideEffect.} =
 
   for dep, cons in depsData.getTable():
     project.dependencies[dep] = cons.getStr()
+
+  if "platforms" in data:
+    readPlatformsData(project, data["platforms"])
 
   ensureMove(project)
 
