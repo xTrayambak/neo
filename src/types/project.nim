@@ -54,12 +54,12 @@ type
     backend*: Backend
     binaries*: seq[string] = @[]
 
-  CPlatformInfo* = object
+  NativePlatformInfo* = object
     link*: seq[string]
     incl*: seq[string]
 
   PlatformInfo* = object
-    c*: Option[CPlatformInfo]
+    native*: Option[NativePlatformInfo]
 
   Project* = object
     package*: ProjectPackageInfo
@@ -268,7 +268,7 @@ func newProject*(
   )
 
 proc save*(project: Project, path: string) =
-  var buffer = newStringOfCap(512)
+  var buffer = newStringOfCap(1024)
 
   # We _COULD_ use nim_toml_serialization's TomlWriter
   # but its output is hideous. As a consequence,
@@ -309,6 +309,13 @@ proc save*(project: Project, path: string) =
     if currDep < depsSize - 1:
       buffer &= "\n"
 
+  if *project.platforms.native:
+    let nativeData = &project.platforms.native
+
+    buffer &= "[platforms.native]\n"
+    buffer &= "include = [" & nativeData.incl.mapIt('"' & it & '"').join(", ") & ']'
+    buffer &= "link = [" & nativeData.link.mapIt('"' & it & '"').join(", ") & ']'
+
   writeFile(path, ensureMove(buffer))
 
 func readProjectKind*(data: string): ProjectKind =
@@ -326,7 +333,7 @@ proc readPlatformsData(project: var Project, data: TomlValueRef) =
   if "native" in data:
     let cPlatData = data["native"]
 
-    var cPlatformInfo: CPlatformInfo
+    var cPlatformInfo: NativePlatformInfo
     cPlatformInfo.link = (
       if "link" in cPlatData:
         cPlatData["link"].getElems().mapIt(it.getStr())
@@ -340,7 +347,7 @@ proc readPlatformsData(project: var Project, data: TomlValueRef) =
         newSeq[string](0)
     )
 
-    project.platforms.c = some(ensureMove(cPlatformInfo))
+    project.platforms.native = some(ensureMove(cPlatformInfo))
 
 proc loadProject*(file: string): Project {.sideEffect.} =
   let

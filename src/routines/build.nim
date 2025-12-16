@@ -3,16 +3,24 @@
 ## build logic into one set of routines.
 ##
 ## Copyright (C) 2025 Trayambak Rai (xtrayambak@disroot.org)
-import std/[os, osproc, options, tables]
+import std/[os, osproc, options, sets, sequtils, tables]
 import
   ../types/[backend, compilation_options, project, toolchain], ../[argparser, output]
 import ./[dependencies, locking, neo_directory, state]
-import pkg/shakar
+import pkg/[results, shakar]
+
+when defined(unix):
+  import ./[pkgconfig]
 
 type
   BuildError* = object of IOError
+
   NoBinaries* = object of BuildError
   IllegalSetup* = object of BuildError
+
+  NativeDependenciesError* = object of BuildError
+  CannotIncludeNativeHeaders* = object of NativeDependenciesError
+  CannotLinkNativeCode* = object of NativeDependenciesError
 
   SolverOutput* = object
     deps*: seq[Dependency]
@@ -36,6 +44,39 @@ type
     targetKind*: BuildTargetKind
 
     testing*: TestingOpts
+
+proc resolveAllNativeDeps*(
+    project: Project, graph: SolvedGraph, state: State
+): tuple[incl, link: HashSet[string]] =
+  var
+    inclDeps = initHashSet[string]()
+    linkDeps = initHashSet[string]()
+
+  proc handleNativeDeps(native: NativePlatformInfo) =
+    let nativeInfo = &project.platforms.native
+
+    for inclDep in nativeInfo.incl:
+      inclDeps.incl(inclDep)
+
+    for linkDep in nativeInfo.link:
+      linkDeps.incl(linkDep)
+
+  if *project.platforms.native:
+    # Firstly, we add everything the root project itself requires.
+    handleNativeDeps(&project.platforms.native)
+
+  # Then, we can go through all dependencies that have a Neo manifest.
+  for node in graph:
+    let projOpt =
+      loadProjectInDir(getDirectoryForPackage(state, node.name, $node.version))
+    if !projOpt:
+      continue
+
+    let proj = &projOpt
+    if *proj.platforms.native:
+      handleNativeDeps(&proj.platforms.native)
+
+  (incl: inclDeps, link: linkDeps)
 
 proc buildBinaries*(
     project: Project,
@@ -78,6 +119,7 @@ proc buildBinaries*(
     graph: SolvedGraph
 
     appendPaths: seq[string]
+    passC, passL: string
 
   if !opts.solverOutput:
     try:
@@ -95,6 +137,31 @@ proc buildBinaries*(
     let output = &opts.solverOutput
     deps = output.deps
     graph = output.graph
+
+  when defined(unix):
+    let pkgConfigPath = getPkgConfPath()
+    let (inclNative, linkNative) = resolveAllNativeDeps(project, graph, state)
+    if inclNative.len > 0:
+      let headersIncluded =
+        getLibsInfo(toSeq(inclNative), PkgConfInfoKind.Cflags, binPath = pkgConfigPath)
+
+      if !headersIncluded:
+        raise newException(
+          CannotIncludeNativeHeaders, "<red>" & headersIncluded.error() & "<reset>"
+        )
+
+      passC &= &headersIncluded
+
+    if linkNative.len > 0:
+      let libsLinked =
+        getLibsInfo(toSeq(linkNative), PkgConfInfoKind.Libs, binPath = pkgConfigPath)
+        # bogos binted?
+
+      if !libsLinked:
+        raise
+          newException(CannotLinkNativeCode, "<red>" & libsLinked.error() & "<reset>")
+
+      passL &= &libsLinked
 
   if opts.targetKind == BuildTargetKind.Tests:
     assert(
@@ -150,6 +217,16 @@ proc buildBinaries*(
         extraFlags: extraFlags,
         appendPaths: appendPaths,
         version: $project.package.version,
+        passC:
+          if len(passC) > 0:
+            @[passC]
+          else:
+            @[],
+        passL:
+          if len(passL) > 0:
+            @[passL]
+          else:
+            @[],
       ),
     )
 

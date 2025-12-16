@@ -86,6 +86,9 @@ proc buildPackageCommand(
     ):
       error "Failed to compile all binaries. Check the error above for more information."
       quit(QuitFailure)
+  except build.NativeDependenciesError as exc:
+    error "Failed to resolve native dependencies via <yellow>pkg-config<reset>"
+    error exc.msg
   except build.BuildError as exc:
     error exc.msg
 

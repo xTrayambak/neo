@@ -23,7 +23,12 @@ proc getPkgConfPath*(): string =
 proc getLibsInfo*(
     targets: seq[string], infoKind: PkgConfInfoKind, binPath: string = getPkgConfPath()
 ): Result[string, string] {.sideEffect.} =
-  let payload = binPath & " --cflags " & targets.join(" ")
+  let payload =
+    binPath & " --" & (
+      case infoKind
+      of PkgConfInfoKind.Cflags: "cflags "
+      of PkgConfInfoKind.Libs: "libs "
+    ) & targets.join(" ")
 
   when not defined(release):
     debugEcho(payload)
