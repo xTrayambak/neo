@@ -55,6 +55,12 @@
       "url": "https://github.com/jangko/nim-noise",
       "checksum": "902bef970357b17973cb17759ed882221b8b096964251acd29dafa78cea0341d"
     },
+    "fuzzy": {
+      "version": "0.1.0",
+      "commit": "6e62092598689dfdc982e15a337f0a069c69be3b",
+      "url": "https://github.com/pigmej/fuzzy",
+      "checksum": "2cde6050fa2e47ae8cb3a3b8c424d976299732e7b7571f86646457703d97879d"
+    },
     "results": {
       "version": "0.5.1",
       "commit": "df8113dda4c2d74d460a8fa98252b0b771bf1f27",

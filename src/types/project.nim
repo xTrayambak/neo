@@ -312,9 +312,9 @@ proc save*(project: Project, path: string) =
   if *project.platforms.native:
     let nativeData = &project.platforms.native
 
-    buffer &= "[platforms.native]\n"
+    buffer &= "\n[platforms.native]\n"
     buffer &= "include = [" & nativeData.incl.mapIt('"' & it & '"').join(", ") & ']'
-    buffer &= "link = [" & nativeData.link.mapIt('"' & it & '"').join(", ") & ']'
+    buffer &= "\nlink = [" & nativeData.link.mapIt('"' & it & '"').join(", ") & ']'
 
   writeFile(path, ensureMove(buffer))
 
