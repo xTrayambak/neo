@@ -21,3 +21,7 @@ curly = ">= 1.1.1"
 pretty = ">= 0.2.0"
 crunchy = ">= 0.1.11"
 parsetoml = ">= 0.7.2"
+
+[platforms.native]
+include = ["libcurl", "openssl"]
+link = ["libcurl", "openssl"]

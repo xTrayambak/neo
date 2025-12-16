@@ -7,7 +7,7 @@ type
   GitError* = object of OSError
   GitNotInstalled* = object of GitError
 
-var cachedGitPath* {.threadvar, global.}: Option[string]
+var cachedGitPath {.threadvar, global.}: Option[string]
 
 proc getGitPath*(): string =
   if likely(*cachedGitPath):

@@ -1,4 +1,4 @@
-import std/[os, strutils, tables, options]
+import std/[os, strutils, sequtils, tables, options]
 import pkg/[parsetoml, results, semver, shakar, url]
 import ./[toolchain, backend]
 
@@ -54,10 +54,18 @@ type
     backend*: Backend
     binaries*: seq[string] = @[]
 
+  NativePlatformInfo* = object
+    link*: seq[string]
+    incl*: seq[string]
+
+  PlatformInfo* = object
+    native*: Option[NativePlatformInfo]
+
   Project* = object
     package*: ProjectPackageInfo
     toolchain*: Toolchain
     dependencies*: Table[string, string]
+    platforms*: PlatformInfo
 
 func `$`*(constraint: VerConstraint): string {.raises: [], inline.} =
   case constraint
@@ -260,7 +268,7 @@ func newProject*(
   )
 
 proc save*(project: Project, path: string) =
-  var buffer = newStringOfCap(512)
+  var buffer = newStringOfCap(1024)
 
   # We _COULD_ use nim_toml_serialization's TomlWriter
   # but its output is hideous. As a consequence,
@@ -301,6 +309,13 @@ proc save*(project: Project, path: string) =
     if currDep < depsSize - 1:
       buffer &= "\n"
 
+  if *project.platforms.native:
+    let nativeData = &project.platforms.native
+
+    buffer &= "[platforms.native]\n"
+    buffer &= "include = [" & nativeData.incl.mapIt('"' & it & '"').join(", ") & ']'
+    buffer &= "link = [" & nativeData.link.mapIt('"' & it & '"').join(", ") & ']'
+
   writeFile(path, ensureMove(buffer))
 
 func readProjectKind*(data: string): ProjectKind =
@@ -313,6 +328,26 @@ func readProjectKind*(data: string): ProjectKind =
     ProjectKind.Library
   else:
     raise newException(ValueError, "Invalid project kind: " & data)
+
+proc readPlatformsData(project: var Project, data: TomlValueRef) =
+  if "native" in data:
+    let cPlatData = data["native"]
+
+    var cPlatformInfo: NativePlatformInfo
+    cPlatformInfo.link = (
+      if "link" in cPlatData:
+        cPlatData["link"].getElems().mapIt(it.getStr())
+      else:
+        newSeq[string](0)
+    )
+    cPlatformInfo.incl = (
+      if "include" in cPlatData:
+        cPlatData["include"].getElems().mapIt(it.getStr())
+      else:
+        newSeq[string](0)
+    )
+
+    project.platforms.native = some(ensureMove(cPlatformInfo))
 
 proc loadProject*(file: string): Project {.sideEffect.} =
   let
@@ -343,6 +378,9 @@ proc loadProject*(file: string): Project {.sideEffect.} =
 
   for dep, cons in depsData.getTable():
     project.dependencies[dep] = cons.getStr()
+
+  if "platforms" in data:
+    readPlatformsData(project, data["platforms"])
 
   ensureMove(project)
 
