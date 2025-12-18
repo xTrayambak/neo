@@ -186,9 +186,13 @@ proc buildBinaries*(
     except locking.LockError as exc:
       raise newException(BuildError, exc.msg)
 
-    # 2. Regenerate `neo.paths` so the compiler knows
-    # what locked versions of dependencies it needs to pull in.
-    writeFile("neo.paths", generateLockedDepPaths(state, graph))
+    if opts.targetKind == BuildTargetKind.Tests:
+      # 2. Generate append paths from the newly constructed graph.
+      appendPaths = getDepPaths(graph, state)
+    else:
+      # 2. Regenerate `neo.paths` so the compiler knows
+      # what locked versions of dependencies it needs to pull in.
+      writeFile("neo.paths", generateLockedDepPaths(state, graph))
   else:
     appendPaths = getDepPaths(graph, state)
 
