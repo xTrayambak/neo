@@ -1,6 +1,6 @@
 import std/[os, strutils]
 import ../types/[project]
-import ../[output], ./git
+import ../[output], ./[project, git]
 
 proc initializeProject*(project: Project) =
   displayMessage("<blue>initializing<reset>", "project " & project.name)

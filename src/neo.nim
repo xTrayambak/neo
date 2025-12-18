@@ -6,8 +6,10 @@ import pkg/[semver, shakar, floof, results, url]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, package_lists]
 import
-  ./routines/
-    [build, initialize, package_lists, forge_aliases, state, dependencies, locking],
+  ./routines/[
+    build, initialize, package_lists, packref_parser, project, forge_aliases, state,
+    dependencies, locking,
+  ],
   ./routines/nimble/primitiveparser
 
 const

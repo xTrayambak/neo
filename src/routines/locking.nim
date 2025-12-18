@@ -5,7 +5,7 @@ import std/[os, options, tables, json]
 #!fmt: off
 import ../output,
        ../types/[lockfile, project],
-       ./[checksumming, dependencies, git, state]
+       ./[checksumming, dependencies, git, project, state]
 #!fmt: on
 import pkg/[jsony, url, results, shakar, semver]
 

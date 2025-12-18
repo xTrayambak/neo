@@ -7,7 +7,8 @@ import std/[algorithm, os, options, strutils, tables, tempfiles]
 import pkg/[url, results, shakar, semver]
 import ../types/[project, package_lists]
 import
-  ../routines/[package_lists, forge_aliases, git, neo_directory, state],
+  ../routines/
+    [package_lists, project, forge_aliases, git, neo_directory, state, packref_parser],
   ../routines/nimble/primitiveparser,
   ../output
 

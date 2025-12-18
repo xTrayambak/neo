@@ -6,7 +6,7 @@
 import std/[os, osproc, options, sets, sequtils, tables]
 import
   ../types/[backend, compilation_options, project, toolchain], ../[argparser, output]
-import ./[dependencies, locking, neo_directory, state]
+import ./[dependencies, locking, neo_directory, project, state]
 import pkg/[results, shakar]
 
 when defined(unix):
