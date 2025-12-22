@@ -3,7 +3,7 @@
 ## Copyright (C) 2025 Trayambak Rai (xtrayambak@disroot.org)
 
 import std/[options, strutils]
-import pkg/[results, semver]
+import pkg/[results, semver, shakar]
 import ../types/[project]
 
 type
@@ -16,11 +16,15 @@ type
   PRefParseError* {.size: sizeof(uint8), pure.} = enum
     InvalidConstraint = "invalid constraint"
     InvalidVersion = "version string cannot be parsed"
+    ExpectedCommitHash = "expected commit hash after hash (#) symbol, got nothing"
+    ExpectedConstraint =
+      "package reference expression must contain either a commit hash or version-constraint pair as an expectation for the dependency"
 
 func parsePackageRefExpr*(expr: string): Result[PackageRef, PRefParseError] =
   var state: PRefParserState
   var i = 0
   var pkg: PackageRef
+  var parsedVersion = false
   pkg.name = newStringOfCap(expr.len - 1) # Best case, expr is unversioned.
 
   let size = expr.len
@@ -37,6 +41,11 @@ func parsePackageRefExpr*(expr: string): Result[PackageRef, PRefParseError] =
         # and increemnt the pointer by 1.
         state = PRefParserState.Hash
         inc i
+
+        let hashSize = size - i
+        if hashSize < 1:
+          # If there's nothing ahead, report an error.
+          return err(PRefParseError.ExpectedCommitHash)
       of strutils.Whitespace:
         # If c is whitespace, ignore it and increment the pointer by 1.
         inc i
@@ -97,6 +106,8 @@ func parsePackageRefExpr*(expr: string): Result[PackageRef, PRefParseError] =
       # Set the state to Version.
       state = PRefParserState.Version
     of PRefParserState.Version:
+      parsedVersion = true
+
       var versionBuffer: string
 
       # While we have not reached EOF, continually increment every
@@ -117,6 +128,11 @@ func parsePackageRefExpr*(expr: string): Result[PackageRef, PRefParseError] =
       except semver.ParseError:
         # If version parsing fails, report an error.
         return err(PRefParseError.InvalidVersion)
+
+  # If neither a version was parsed, nor a commit hash was consumed,
+  # then report an error.
+  if not parsedVersion and !pkg.hash:
+    return err(PRefParseError.ExpectedConstraint)
 
   # Return `pkg`.
   ok(ensureMove(pkg))
