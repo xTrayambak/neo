@@ -19,6 +19,9 @@ type
     ExpectedCommitHash = "expected commit hash after hash (#) symbol, got nothing"
     ExpectedConstraint =
       "package reference expression must contain either a commit hash or version-constraint pair as an expectation for the dependency"
+    InvalidCommitHash = "invalid commit hash"
+
+const AcceptableCharsHash = strutils.Whitespace + strutils.Letters + strutils.Digits
 
 func parsePackageRefExpr*(expr: string): Result[PackageRef, PRefParseError] =
   var state: PRefParserState
@@ -61,8 +64,14 @@ func parsePackageRefExpr*(expr: string): Result[PackageRef, PRefParseError] =
 
       # While EOF has not been reached, 
       while i < size:
-        # Increment the character at the pointer to buff.
-        buff &= expr[i]
+        let c = expr[i]
+        if c notin AcceptableCharsHash:
+          # If c is not a whitespace character or alphanumeric character,
+          # report an error.
+          return err(PRefParseError.InvalidCommitHash)
+
+        # Append the character at the pointer to buff.
+        buff &= c
         inc i
 
       # Set ref.hash to buffer, stripped of any preceding or succeeding whitespace.
