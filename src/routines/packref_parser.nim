@@ -56,8 +56,8 @@ func parsePackageRefExpr*(expr: string): Result[PackageRef, PRefParseError] =
         buff &= expr[i]
         inc i
 
-      # Set ref.hash to buffer.
-      pkg.hash = some(ensureMove(buff))
+      # Set ref.hash to buffer, stripped of any preceding or succeeding whitespace.
+      pkg.hash = some(strip(ensureMove(buff)))
 
       # End the loop.
       break
