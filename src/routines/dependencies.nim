@@ -2,7 +2,7 @@
 ## Currently, we use the MVS algorithm to handle
 ## dependency conflicts. The highest version of a dependency is always chosen.
 ##
-## Copyright (C) 2025 Trayambak Rai (xtrayambak at disroot dot org)
+## Copyright (C) 2025 Trayambak Rai (xtrayambak@disroot.org)
 import std/[algorithm, os, options, strutils, tables, tempfiles]
 import pkg/[url, results, shakar, semver]
 import ../types/[project, package_lists]
@@ -53,11 +53,20 @@ proc find(cache: SolverCache, package: string): Option[PackageListItem] {.inline
       if pkg.name == package:
         return some(pkg)
 
-proc getDirectoryForPackage*(state: State, name: string, version: string): string =
+proc getDirectoryForPackage*(
+    state: State,
+    name: string,
+    version: string,
+    commitHash: Option[string] = none(string),
+): string =
   let
     parsedUrl = tryParseURL(name)
     packagesDir = getNeoDir() / "packages"
-    version = if version.len < 1: "any" else: version
+    version =
+      if *commitHash:
+        &commitHash
+      else:
+        version
 
   if !parsedUrl:
     # Regular package name route (e.g: zippy, webby, etc.)
@@ -89,7 +98,7 @@ proc findDirectoryForPackage*(name: string): Option[string] =
     return some(dir)
 
 proc isDepInstalled*(state: State, dep: PackageRef): bool =
-  dirExists(getDirectoryForPackage(state, dep.name, $dep.version))
+  dirExists(getDirectoryForPackage(state, dep.name, $dep.version, dep.hash))
 
 proc getDepPaths*(graph: SolvedGraph, state: State): seq[string] =
   var paths: seq[string]
@@ -186,7 +195,10 @@ proc downloadPackageFromURL*(
     version = pkg.version
     prettyVersion =
       if pkg.constraint == VerConstraint.None:
-        "any"
+        if *pkg.hash:
+          &pkg.hash
+        else:
+          "any"
       else:
         $version
 
@@ -300,9 +312,13 @@ proc handleDep*(cache: SolverCache, dep: PackageRef, state: State): Dependency =
       finalDest = some(getDirectoryForPackage(state, list[urlString], $dep.version))
 
     if !finalDest or not dirExists(&finalDest):
+      # We need to download the package. It does not exist.
       finalDest = some(
         downloadPackageFromURL(urlString, dest = none(string), state = state, pkg = dep)
       )
+
+    # Ensure that we're on the intended version.
+    checkoutPackageState(dep, &finalDest)
 
   # Now, we'll load up a Neo project if it exists for that project.
   let
