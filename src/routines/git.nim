@@ -26,6 +26,23 @@ proc getGitPath*(): string =
   cachedGitPath = some(path)
   path
 
+proc sanitizeDirectory(dest: string) =
+  ## Artifacts downloaded from the internet should be treated _very_
+  ## warily. Neo, by default, strips the X bit from all downloaded packages' files,
+  ## to ensure that they cannot execute anything. They shouldn't be able to do this
+  ## for two distinct, major reasons:
+  ##
+  ## * Reproducability (the mutations scripts can make is unobservable)
+  ## * Security (the user must be aware of everything being executed)
+
+  # Go through each path in the destination and remove
+  # the executable (X) bit from every single file, if found.
+  # There is no sane excuse for any package to require executables,
+  # as they're only meant to provide Nim source files, and maybe
+  # some extra non-Nim files but NEVER executable code.
+  for path in walkDirRec(dest, yieldFilter = {pcFile}):
+    exclFilePermissions(path, {fpUserExec, fpGroupExec, fpOthersExec})
+
 proc gitClone*(
     url: string | URL, dest: string, depth: uint = 1, branch: string = ""
 ): Result[void, string] =
@@ -45,15 +62,8 @@ proc gitClone*(
 
   let (output, code) = execCmdEx(payload)
 
-  # Go through each path in the destination and remove
-  # the executable (X) bit from every single file, if found.
-  # There is no sane excuse for any package to require executables,
-  # as they're only meant to provide Nim source files, and maybe
-  # some extra non-Nim files but NEVER executable code.
-  for path in walkDirRec(dest, yieldFilter = {pcFile}):
-    exclFilePermissions(path, {fpUserExec, fpGroupExec, fpOthersExec})
-
   if code == 0:
+    sanitizeDirectory(dest)
     return ok()
 
   err(output)
@@ -63,6 +73,7 @@ proc gitCheckout*(dest: string, branch: string = "master"): Result[void, string]
   let (output, code) = execCmdEx(git & " -C " & dest & " checkout " & branch.quoteShell)
 
   if code == 0:
+    sanitizeDirectory(dest)
     return ok()
 
   err(output)
