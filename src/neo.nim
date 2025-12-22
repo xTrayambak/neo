@@ -636,11 +636,10 @@ proc testCommand(args: argparser.Input, state: State) =
   let testsDir = dir / "tests"
 
   var testList: seq[string]
-  for kind, path in walkDir(testsDir):
+  for path in walkDirRec(testsDir, yieldFilter = {pcFile}):
     let splittedFile = splitFile(path)
     #!fmt: off
-    if kind != pcFile or
-      splittedFile.ext != ".nim" or
+    if splittedFile.ext != ".nim" or
       not splittedFile.name
         .startsWith('t'): continue
     #!fmt: on

@@ -1,3 +1,7 @@
+## Package reference parser machinery
+##
+## Copyright (C) 2025 Trayambak Rai (xtrayambak@disroot.org)
+
 import std/[options, strutils]
 import pkg/[results, semver]
 import ../types/[project]
