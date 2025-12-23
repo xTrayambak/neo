@@ -152,7 +152,9 @@ proc inferDestPackageName*(dir: string): string =
   let project = loadProject(neoFilePath)
   project.name
 
-proc checkoutPackageState*(pkg: PackageRef, dest: string) =
+proc checkoutPackageState*(
+    pkg: PackageRef, dest: string, fetchingOnlineState: bool = false
+) =
   if pkg.constraint != VerConstraint.None:
     let checkout = gitCheckout(dest, $pkg.version)
     if !checkout:
@@ -171,12 +173,23 @@ proc checkoutPackageState*(pkg: PackageRef, dest: string) =
           "Using base version; cannot checkout to " & pkg.name & '@' & $pkg.version,
         )
   elif *pkg.hash:
+    if fetchingOnlineState:
+      discard gitPull(dest)
+
     if !gitCheckout(dest, &pkg.hash):
-      raise newException(
-        InvalidCommitHash,
-        "Cannot checkout to revision <red>" & &pkg.hash & "<reset> for package <blue>" &
-          pkg.name & "<reset>!",
-      )
+      if fetchingOnlineState:
+        raise newException(
+          InvalidCommitHash,
+          "Cannot checkout to revision <red>" & &pkg.hash & "<reset> for package <blue>" &
+            pkg.name & "<reset>!",
+        )
+      else:
+        displayMessage(
+          "<yellow>warning<reset>",
+          "Cannot find revision <red>" & &pkg.hash & "<reset> of package <blue>" &
+            pkg.name & "<reset>, checking upstream.",
+        )
+        checkoutPackageState(pkg, dest, fetchingOnlineState = true)
 
 proc downloadPackageFromURL*(
     url: string | URL,

@@ -89,6 +89,12 @@ proc gitRevParse*(dir: string): Result[string, string] =
 proc gitSyncTags*(dir: string): bool =
   execCmd(getGitPath() & " -C " & dir & " fetch --all --tags") == 0
 
+proc gitPull*(dir: string): bool =
+  let res = execCmdEx(getGitPath() & " -C " & dir & " pull --ff-only").exitCode == 0
+  sanitizeDirectory(dir)
+
+  res
+
 proc gitListTags*(dir: string): Result[seq[string], string] =
   let (output, code) = execCmdEx(getGitPath() & " -C " & dir & " tag")
 
