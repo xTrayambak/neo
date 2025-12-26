@@ -10,6 +10,9 @@ Neo is a new package manager for the [Nim programming language](https://nim-lang
 - Using modern algorithms since we're not scared of breaking things (like using SHA-256 for hashing)
 - Add infrastructure for "custom targets" like WASM
 
+# Support
+You can join [the Discord server](https://discord.gg/q49NSg8eaG) here for help with Neo, or to follow its development.
+
 # Roadmap
 Neo is currently a ~2.1K LoC project, and has the following features ready and working:
 - [X] `neo build` command
