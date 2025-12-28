@@ -34,7 +34,7 @@ Neo depends on several Nim libraries to function, here is what you need to vendo
 - zippy 0.10.6
 - semver 1.2.3
 - jsony 1.1.5
-- floof 1.0.0
+- fuzzy 0.1.0
 - url 0.1.3
 - nimsimd 1.3.2
 - benchy 0.0.1
@@ -54,7 +54,7 @@ After cloning all of these and checking them out to the intended version, do the
 Assuming all your dependencies are in a directory like `vendor/`:
 ```
 $ ls vendor/
-benchy-0.0.1    floof-1.0.0    nimsimd-1.3.2    pretty-0.2.0   shakar-0.1.3  zippy-0.10.6
+benchy-0.0.1    fuzzy-1.0.0    nimsimd-1.3.2    pretty-0.2.0   shakar-0.1.3  zippy-0.10.6
 crunchy-0.1.11  jsony-1.1.5    noise-0.1.10     results-0.5.1  url-0.1.3
 curly-1.1.1     libcurl-1.0.0  parsetoml-0.7.2  semver-1.2.3   webby-0.1.7
 ```

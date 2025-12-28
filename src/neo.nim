@@ -1,8 +1,8 @@
 ## Neo - the new package manager for Nim
 ## 
 ## Copyright (C) Trayambak Rai (xtrayambak@disroot.org)
-import std/[os, osproc, options, tables, strutils, times]
-import pkg/[semver, shakar, floof, results, url]
+import std/[algorithm, os, osproc, options, tables, strutils, times]
+import pkg/[fuzzy, semver, shakar, results, url]
 import ./[argparser, output]
 import ./types/[project, toolchain, backend, package_lists]
 import
@@ -165,29 +165,23 @@ proc searchPackageCommand(args: argparser.Input, state: State) =
   if args.flagAsInt("limit") ?= customLimit:
     limit = customLimit
 
-  let pkgs = block:
-    var res = newSeq[string](index.len)
-    for i, pkg in index:
-      res[i] = pkg.name
+  var highest = newSeqOfCap[tuple[pkg: PackageListItem, score: float]](limit)
+  for pkg in index:
+    let score = fuzzyMatchSmart(package, pkg.name)
+    if score > 0.8f or fuzzyMatchSmart(package, pkg.description) > 0.8f:
+      highest &= (pkg: pkg, score: score)
 
-    move(res)
+  for n, item in highest.sortedByIt(it.score).reversed():
+    if n > limit:
+      break
 
-  let results = search(package, pkgs)
+    displayMessage("<green>" & item.pkg.name & "<reset>", item.pkg.description)
 
-  for i, pkg in results:
-    # OPTIMIZE: We're currently doing two lookups per match. We should ideally do one.
-    let package = &index.find(pkg.text)
-
-    if i > limit - 1:
-      continue
-
-    displayMessage("<green>" & pkg.text & "<reset>", package.description)
-
-  if limit < results.len:
+  if limit < highest.len:
     stdout.write('\n')
     displayMessage(
       "<blue>...<reset>",
-      "and <green>" & $(results.len - limit) &
+      "and <green>" & $(highest.len - limit) &
         "<reset> packages more (use --limit:<N> to see more)",
     )
 
