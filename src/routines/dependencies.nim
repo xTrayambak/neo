@@ -331,7 +331,7 @@ proc handleDep*(cache: SolverCache, dep: PackageRef, state: State): Dependency =
       )
 
     # Ensure that we're on the intended version.
-    checkoutPackageState(dep, &finalDest)
+    # checkoutPackageState(dep, &finalDest)
 
   # Now, we'll load up a Neo project if it exists for that project.
   let
@@ -548,9 +548,20 @@ proc updateGraphIfPossible*(
     graph: var SolvedGraph, project: Project, cache: SolverCache, state: State
 ) =
   for i, node in graph:
+    when not defined(release):
+      debugEcho "Checking updates for " & node.name
+
     let currVersion = node.version
-    let versionsAvailableOpt =
-      gitListTags(getDirectoryForPackage(state, node.name, $currVersion))
+    let directory = getDirectoryForPackage(state, node.name, $currVersion)
+
+    if not gitSyncTags(directory):
+      displayMessage(
+        "<yellow>warning<reset>",
+        "failed to synchronize tags for package <red>" & node.name &
+          "<reset>; new versions will not be discoverable to the solver.",
+      )
+
+    let versionsAvailableOpt = gitListTags(directory)
 
     if !versionsAvailableOpt:
       displayMessage(
@@ -561,6 +572,9 @@ proc updateGraphIfPossible*(
       continue
 
     let versionsAvailable = &versionsAvailableOpt
+
+    when not defined(release):
+      debugEcho "=> " & $versionsAvailable
 
     var fullRange = newSeqOfCap[semver.Version](versionsAvailable.len)
     for version in versionsAvailable:
@@ -575,6 +589,12 @@ proc updateGraphIfPossible*(
 
     let winningCandidate =
       computePotentialUpdateCandidate(currVersion, ensureMove(fullRange))
+
+    when not defined(release):
+      debugEcho "~> " & (if *winningCandidate: $(&winningCandidate)
+      else: "none")
+
+      debugEcho "\n\n"
 
     if *winningCandidate:
       when not defined(release):
