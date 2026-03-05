@@ -100,7 +100,7 @@ proc buildBinaries*(
   var toolchain = newToolchain(version = project.toolchain.version)
 
   var extraFlags: string
-  for flag, value in args.flags:
+  for flag, value in args.forwardedFlags:
     extraFlags &= "--" & flag & ':' & value & ' '
 
   if not hasColorSupport:
