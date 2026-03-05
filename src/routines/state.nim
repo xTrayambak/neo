@@ -27,11 +27,6 @@ proc saveState*(state: StateObj) =
   if state.fd != nil:
     unlockFile(state.fd)
 
-proc `=destroy`*(
-    state: StateObj
-) {.raises: [UnlockError, IOError, KeyError, OSError].} =
-  saveState(state)
-
 proc getNeoState*(): State =
   let dir = getNeoDir()
   discard existsOrCreateDir(dir)
