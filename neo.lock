@@ -2,10 +2,10 @@
   "version": 0,
   "packages": {
     "zippy": {
-      "version": "0.10.18",
-      "commit": "9ab82da84edfd6483d273dfcf8a921309945861e",
+      "version": "0.10.6",
+      "commit": "123cd593f513d584526f119e7ccb65a7baefa8fa",
       "url": "https://github.com/guzba/zippy",
-      "checksum": "edfcd3eec2c3edaf6f02f5895afd0a5448816eb05bd4646e56753f2742f1479c"
+      "checksum": "a0e8a83b16cc2b99599f26ba6aea0bc4cdf63f1f792ee3d455364621ffcf2201"
     },
     "semver": {
       "version": "1.2.3",
@@ -14,16 +14,16 @@
       "checksum": "bba2e52cbecbf187396b614307536e876c62d2a906ddd25654cad0b4d49104c9"
     },
     "jsony": {
-      "version": "1.1.6",
-      "commit": "bb647e1ca21af25ffdc423bcb96feeeeae963ca2",
+      "version": "1.1.5",
+      "commit": "ea811bec7fa50f5abd3088ba94cda74285e93f18",
       "url": "https://github.com/treeform/jsony",
-      "checksum": "54e73262274bd70a58f788039572c15e46d19b3261f01a0e30ebd1b615f46908"
+      "checksum": "2c362bd420638bdea7c9a2ecd3c700eb28279090ee405dcf69a5f924e972b892"
     },
     "url": {
-      "version": "0.1.4",
-      "commit": "1431b7e3378d754186ff52e0a31f6b091df9f90e",
+      "version": "0.1.7",
+      "commit": "2bc808241b2bf10017e81b4ce68c5ad070aaacf2",
       "url": "https://github.com/xTrayambak/url",
-      "checksum": "508065c3ade2e12b3ec71fd1525540544914366b785cab427eb70a3d60f78f8f"
+      "checksum": "a560db8af5d9b051206d29db05617c2868de2c208398ab1c5cc930a8a39ab14f"
     },
     "nimsimd": {
       "version": "1.3.2",
@@ -80,10 +80,10 @@
       "checksum": "c0625f3df18697d1fbb5e2514c3cd28cb1656ffbc8e45523fefc88aea93a5056"
     },
     "gh:xTrayambak/overdrive": {
-      "version": "0.1.1",
-      "commit": "58fc995992720ea9ed8cae7c5a42d13245a5ae2a",
+      "version": "0.2.0",
+      "commit": "13cf1cab8157f4aebd6f1313c8203d0576e42539",
       "url": "gh:xTrayambak/overdrive",
-      "checksum": "e8fd6ec89a2927a4575c13c0378a106c4434358ced3143cb41f892da45d54238"
+      "checksum": "83eec5d8addec46c1f1060b47d6b30d74f89be6cfc0b57f1c18f76b7bf06c9d0"
     },
     "libcurl": {
       "version": "1.0.0",
@@ -98,10 +98,10 @@
       "checksum": "0ae2e94d3de1de4349a94136d65fd7bf4cdb00a356f24e06bd3bcd9c366b01bc"
     },
     "webby": {
-      "version": "0.2.1",
-      "commit": "325d6ade0970562bee7d7d53961a2c3287f0c4bc",
+      "version": "0.1.7",
+      "commit": "5820b276bfa31d01b5895d59a4b292b47f6c7277",
       "url": "https://github.com/treeform/webby/",
-      "checksum": "797b93dc4b4a8fac72b396e344ddf77b282fd454c1846365d484a69df6a76539"
+      "checksum": "250f098239ad022824ffe3bc34d12a47df7c51a79962229dcb75167161cf2b82"
     }
   }
 }
