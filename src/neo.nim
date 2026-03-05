@@ -68,6 +68,7 @@ proc buildPackageCommand(
 
   if not fileExists(sourceFile):
     error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
+    saveState(state[])
     quit(QuitFailure)
 
   var project: Project
@@ -135,8 +136,9 @@ proc runPackageCommand(args: argparser.Input, useColors: bool, state: State) =
       error "Failed to compile binary output <red>" & binaryName &
         "<reset>. Please check the error above."
       quit(QuitFailure)
-
-    discard execCmd("./" & binaryName)
+    
+    saveState(state[])
+    quit((if execCmd("./" & binaryName) == 0: QuitSuccess else: QuitFailure))
   except build.BuildError as exc:
     error exc.msg
     quit(QuitFailure)
@@ -704,7 +706,7 @@ proc updateCommand(args: argparser.Input, state: State) =
     "all dependencies with new potential candidates successfully.",
   )
 
-proc showHelpCommand() {.noReturn, sideEffect.} =
+proc showHelpCommand() {.sideEffect.} =
   echo "Neo is a package manager for Nim"
   displayMessage(
     "<green>Usage<reset>", "neo <yellow>[command]<reset> <blue>[args]<reset>"
@@ -779,7 +781,11 @@ proc main() {.inline.} =
       showHelpCommand()
     else:
       error "invalid command <red>`" & args.command & "`<reset>"
+      saveState(state[])
       quit(QuitFailure)
+
+  saveState(state[])
+  quit(QuitSuccess)
 
 when isMainModule:
   main()

@@ -23,8 +23,10 @@ type
   State* = ref StateObj
 
 proc saveState*(state: StateObj) =
+  # debugEcho(":: save mgr state")
   writeFile(getNeoDir() / "state.json", toJson(state))
   if state.fd != nil:
+    # debugEcho(":: release fd lock")
     unlockFile(state.fd)
 
 proc getNeoState*(): State =
