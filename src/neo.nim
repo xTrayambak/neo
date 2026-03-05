@@ -60,11 +60,7 @@ proc buildPackageCommand(
 ) {.noReturn.} =
   var directory = "src"
   let sourceFile =
-    if args.arguments.len > 0:
-      directory = args.arguments[0] / "src"
-      args.arguments[0] / "neo.toml"
-    else:
-      getCurrentDir() / "neo.toml"
+    getCurrentDir() / "neo.toml"
 
   if not fileExists(sourceFile):
     error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
@@ -78,13 +74,18 @@ proc buildPackageCommand(
   except TomlError as exc:
     error "Failed to load project: " & exc.msg
     quit(QuitFailure)
+  
+  var targets: Option[seq[string]]
+  if args.arguments.len > 0:
+    # If we have any arguments, treat them as binary output names.
+    targets = some(args.arguments)
 
   try:
     if not buildBinaries(
       project = project,
       directory = directory,
       args = args,
-      opts = BuildOpts(release: args.enabled("release")),
+      opts = BuildOpts(release: args.enabled("release"), targets: ensureMove(targets)),
       state = state,
     ):
       error "Failed to compile all binaries. Check the error above for more information."
