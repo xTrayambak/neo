@@ -600,7 +600,7 @@ proc migrateCommand(args: argparser.Input) =
 proc metaCommand() =
   echo "Neo " & NeoVersion
   echo "Compiled with Nim " & NimVersion
-  echo "Copyright (C) 2025 Trayambak Rai"
+  echo "Copyright (C) 2025-2026 Trayambak Rai"
 
 proc lockCommand(args: argparser.Input, state: State) =
   let lockfilePath =
