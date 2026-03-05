@@ -1,6 +1,6 @@
 ## Argument parser for Neo, based on `std/parseopt`
 import std/[os, parseopt, tables, strutils, options]
-import pkg/[shakar, pretty]
+import pkg/[shakar]
 
 type Input* = object
   command*: string
@@ -61,5 +61,4 @@ proc parseInput*(): Input {.inline.} =
       else:
         input.arguments &= parser.key
   
-  print input
   input

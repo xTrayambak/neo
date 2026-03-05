@@ -1,5 +1,5 @@
 import std/[tables, options]
-import pkg/[parsetoml, results, semver]
+import pkg/[parsetoml, results, semver, shakar]
 import ./[backend, toolchain]
 
 type
@@ -65,6 +65,15 @@ func `$`*(constraint: VerConstraint): string {.raises: [], inline.} =
   of VerConstraint.GreaterThanEqual: ">="
   of VerConstraint.LesserThan: "<"
   of VerConstraint.LesserThanEqual: "<="
+
+func `$`*(pkg: PackageRef): string {.raises: [], inline.} =
+  var buff = pkg.name
+  if *pkg.hash:
+    buff &= " #" & &pkg.hash
+  else:
+    buff &= ' ' & $pkg.constraint & ' ' & $pkg.version
+
+  ensureMove(buff)
 
 func name*(project: Project): string {.inline.} =
   project.package.name
