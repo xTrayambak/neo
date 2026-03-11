@@ -176,10 +176,14 @@ proc buildBinaries*(
     else:
       project.package.binaries
 
-
-  for bin in buildList:
-    if not project.package.binaries.contains(bin):
-      raise newException(NoSuchBinary, "No such binary <red>" & bin & "<reset> is defined in the <blue>neo.toml<reset> file. As such, Neo does not know where to find it. Define it in the project manifest.")
+  if opts.targetKind != BuildTargetKind.Tests:
+    for bin in buildList:
+      if not project.package.binaries.contains(bin):
+        raise newException(
+          NoSuchBinary,
+          "No such binary <red>" & bin &
+            "<reset> is defined in the <blue>neo.toml<reset> file. As such, Neo does not know where to find it. Define it in the project manifest.",
+        )
 
   let parentDirectory = parentDir(directory)
   if lockfileExists(parentDirectory):
