@@ -261,7 +261,7 @@ proc downloadPackage*(
     dest = getDirectoryForPackage(state, pkg.name, $pkg.version)
 
   if dirExists(dest) and not ignoreCache:
-    return
+    return dest
 
   downloadPackageFromURL(entry.url, some(dest), state, meth, pkg)
 
@@ -300,7 +300,7 @@ proc handleDep*(cache: SolverCache, dep: PackageRef, state: State): Dependency =
     let pkg = &package
 
     if not isDepInstalled(state, dep):
-      finalDest = some(downloadPackage(pkg, dep, state))
+      finalDest = some(downloadPackage(pkg, dep, state, ignoreCache = true))
     else:
       finalDest = some(getDirectoryForPackage(state, dep.name, $dep.version))
 
