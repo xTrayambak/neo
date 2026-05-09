@@ -23,8 +23,7 @@ proc main {.inline.} =
   quit(QuitSuccess)
 
 when isMainModule:
-  main()
-      """,
+  main()""",
     )
     project.package.binaries = @[project.name]
   of ProjectKind.Library:
@@ -38,8 +37,7 @@ when isMainModule:
 # will automatically get all the publically marked and exported symbols.
 import pkg/$1/submodule
 
-export submodule
-""" %
+export submodule""" %
         [project.name],
     )
     writeFile(
@@ -49,8 +47,7 @@ export submodule
 # This is a submodule. It's imported in the main library file.
 
 func add*(a, b: int): int =
-  a + b
-""",
+  a + b""",
     )
 
     createDir(project.name / "tests")
@@ -69,8 +66,7 @@ suite "a set of tests":
 
   test "other tests":
     check(add(2, 2) == 4)
-    check(add(4, 4) == 8)
-  """ %
+    check(add(4, 4) == 8)""" %
         [project.name],
     )
     writeFile(
@@ -91,8 +87,7 @@ proc main() {.inline.} =
   echo add(1, 2)
 
 when isMainModule:
-  main()
-""" %
+  main()""" %
         [project.name],
     )
 
@@ -103,8 +98,7 @@ when isMainModule:
 # This is a submodule. It's imported in the main file.
 
 func add*(a, b: int): int =
-  a + b
-""",
+  a + b""",
     )
 
     createDir(project.name / "tests")
@@ -123,8 +117,7 @@ suite "a set of tests":
 
   test "other tests":
     check(add(2, 2) == 4)
-    check(add(4, 4) == 8)
-  """ %
+    check(add(4, 4) == 8)""" %
         [project.name],
     )
     writeFile(

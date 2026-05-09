@@ -173,14 +173,14 @@ proc generateLockFile*(dir: string, lockfilePath: string, state: State): bool =
     writeFile(
       dir / "config.nims",
       """
-## Neo lockfile config
+when defined(NeoPkgVersion) or defined(UseNeoDeps):
+  ## Neo lockfile config
 
---noNimblePath
-when withDir(thisDir(), system.fileExists("neo.paths")):
-  include "neo.paths"
+  --noNimblePath
+  when withDir(thisDir(), system.fileExists("neo.paths")):
+    include "neo.paths"
 
-## End of Neo lockfile config
-    """,
+  ## End of Neo lockfile config""",
     )
   except IOError, OSError:
     error "Cannot write files: " & getCurrentException().msg
