@@ -353,7 +353,8 @@ proc handleDep*(cache: SolverCache, dep: PackageRef, state: State): Dependency =
   if neoFileExists:
     var project = loadProject(neoFilePath)
     var dependency = Dependency(pkgRef: dep)
-    dependency.project = project
+    dependency.project = ensureMove(project)
+    dependency.pkgRef.version = &dependency.project.version
 
     for childDep in dependency.project.getPackageRefs():
       dependency.deps &= handleDep(cache, childDep, state = state)
