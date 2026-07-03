@@ -1,6 +1,6 @@
 ## Neo - the new package manager for Nim
 ## 
-## Copyright (C) Trayambak Rai (xtrayambak@disroot.org)
+## Copyright (C) 2025-2026 Trayambak Rai (xtrayambak@disroot.org)
 import std/[algorithm, os, osproc, options, tables, strutils, times]
 import pkg/[fuzzy, semver, shakar, results, url]
 import ./[argparser, output]
@@ -59,8 +59,7 @@ proc buildPackageCommand(
     args: argparser.Input, hasColorSupport: bool, state: State
 ) {.noReturn.} =
   var directory = "src"
-  let sourceFile =
-    getCurrentDir() / "neo.toml"
+  let sourceFile = getCurrentDir() / "neo.toml"
 
   if not fileExists(sourceFile):
     error "Cannot find Neo build file at: <red>" & sourceFile & "<reset>"
@@ -74,7 +73,7 @@ proc buildPackageCommand(
   except TomlError as exc:
     error "Failed to load project: " & exc.msg
     quit(QuitFailure)
-  
+
   var targets: Option[seq[string]]
   if args.arguments.len > 0:
     # If we have any arguments, treat them as binary output names.
@@ -137,7 +136,7 @@ proc runPackageCommand(args: argparser.Input, useColors: bool, state: State) =
       error "Failed to compile binary output <red>" & binaryName &
         "<reset>. Please check the error above."
       quit(QuitFailure)
-    
+
     saveState(state[])
     quit((if execCmd("./" & binaryName) == 0: QuitSuccess else: QuitFailure))
   except build.BuildError as exc:
