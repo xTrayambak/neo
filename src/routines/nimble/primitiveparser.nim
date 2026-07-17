@@ -18,6 +18,9 @@ func parseNimbleFile*(source: string): NimbleFileInfo =
       index = line.find('"')
       stop = line.rfind('"')
 
+    if index == -1 or stop == -1:
+      return
+
     line[index + 1 ..< stop]
 
   func extractStrVecValue(
