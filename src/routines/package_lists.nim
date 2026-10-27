@@ -72,7 +72,7 @@ proc lazilyFetchPackageList*(state: State, url: string): Option[PackageList] =
 
   # Our current threshold is 4 hours (14400 seconds)
   # TODO: Make this threshold customizable.
-  if (currTime - lastSync) < 14400:
+  if (currTime - lastSync) < (3600 * 24):
     let cached = getCachedPackageList(url)
 
     if *cached:

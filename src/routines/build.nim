@@ -3,7 +3,7 @@
 ## build logic into one set of routines.
 ##
 ## Copyright (C) 2025 Trayambak Rai (xtrayambak@disroot.org)
-import std/[os, osproc, options, sets, sequtils, tables]
+import std/[os, osproc, options, sets, sequtils, strutils, tables]
 import
   ../types/[backend, compilation_options, project, toolchain], ../[argparser, output]
 import ./[dependencies, locking, neo_directory, project, state]
@@ -139,7 +139,12 @@ proc buildBinaries*(
     deps = output.deps
     graph = output.graph
 
-  when defined(unix):
+  # We do not wish to include our native dependencies in the event of a Windows target.
+  let isWindowsTarget = (
+    args.forwardedFlags.contains("os") and
+    cmpIgnoreCase(args.forwardedFlags["os"], "windows") == 0
+  )
+  if defined(unix) and not isWindowsTarget:
     let pkgConfigPath = getPkgConfPath()
     let (inclNative, linkNative) = resolveAllNativeDeps(project, graph, state)
     if inclNative.len > 0:
